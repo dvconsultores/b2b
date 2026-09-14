@@ -1,0 +1,29 @@
+# b2b outreach — server compose file. Lives in /opt/b2b next to .env and data/ (b2b.sqlite3).
+#
+#   cd /opt/b2b
+#   docker compose -f b2b.yml pull
+#   CONFIRM_CAMPAIGN=primer-contacto-2026 docker compose -f b2b.yml up -d    # starts ONE batch
+#   docker compose -f b2b.yml logs -f
+#
+# Never put CONFIRM_CAMPAIGN in .env: give it on the command line for each launch.
+# See docs/deployment.md.
+services:
+  b2b-outreach:
+    image: ${DOCKER_USERNAME:-andresdom2004}/b2b-outreach:latest
+    container_name: b2b-outreach
+    # One batch per launch. "always" would relaunch the container after every batch.
+    restart: "no"
+    labels:
+      # Not updated by Watchtower: an automatic restart would interrupt a batch in progress.
+      # Update between batches with: docker compose -f b2b.yml pull
+      - "com.centurylinklabs.watchtower.enable=false"
+    environment:
+      - CONFIRM_CAMPAIGN=${CONFIRM_CAMPAIGN:-}
+      - FORCE_NO_DMARC=${FORCE_NO_DMARC:-0}
+      - ENV_FILE=/app/.env
+      - TZ=America/Caracas
+    volumes:
+      # .env is read by the app itself (read-only); it is not passed as container environment.
+      - ./.env:/app/.env:ro
+      - ./data:/app/data
+    stop_grace_period: 30s

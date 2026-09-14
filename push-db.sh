@@ -3,7 +3,8 @@
 # push-db.sh — Upload the b2b contact database from this machine to the server.
 #
 #   Local DB  : ${LOCADB_LOCATION:-data}/${DBNAME:-b2b.sqlite3}
-#   Server DB : ${SRVUSER}@${SRVHOST}:${SRVDB_LOCATION:-/opt/b2b}/${DBNAME:-b2b.sqlite3}
+#   Server DB : ${SRVUSER}@${SRVHOST}:${SRVDB_LOCATION:-/opt/b2b/data}/${DBNAME:-b2b.sqlite3}
+#               (/opt/b2b/data is mounted by b2b.yml as /app/data)
 #
 # Reads SRVUSER / SRVPASS / SRVHOST / SRVDB_LOCATION / LOCADB_LOCATION / DBNAME from .env.
 # Uses sshpass (password passed through the environment, never on the command line) when
@@ -63,7 +64,7 @@ if [[ -z "$SRVUSER" || -z "$SRVHOST" ]]; then
 fi
 
 LOCAL_DIR="${LOCADB_LOCATION:-$SCRIPT_DIR/data}"
-SERVER_DB_DIR="${SRVDB_LOCATION:-/opt/b2b}"
+SERVER_DB_DIR="${SRVDB_LOCATION:-/opt/b2b/data}"
 DB_FILE="${DBNAME:-b2b.sqlite3}"
 LOCAL_DIR="${LOCAL_DIR%/}"
 SERVER_DB_DIR="${SERVER_DB_DIR%/}"

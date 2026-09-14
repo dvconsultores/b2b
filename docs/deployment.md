@@ -9,15 +9,25 @@ on its own: the next launch is refused until you record a manual inbox check.
 Nothing personal is in the image or the repository: the database and `.env` live only on this
 machine and in `/opt/b2b` on the server.
 
+## Server layout
+
+```text
+/opt/b2b/
+├── b2b.yml          # compose file (from this repository)
+├── .env             # same keys as locally; chmod 600
+└── data/
+    └── b2b.sqlite3  # the send tracker — source of truth after the first batch
+```
+
 ## `.env` keys
 
 | Key | Used by |
 |-----|---------|
 | `HOST_EMAIL`, `PORT_EMAIL`, `USER_EMAIL`, `PASS_EMAIL`, `SENDER_EMAIL`, `SMTP_FROM_NAME` | sending (SES SMTP) |
 | `TEST_RECIPIENTS` | test mode and the end-of-batch summary email |
-| `DOCKER_USERNAME`, `DOCKER_PASSWORD` | `deploy.sh` (Docker Hub) and the image name in `docker-compose.yml` |
+| `DOCKER_USERNAME`, `DOCKER_PASSWORD` | `deploy.sh` (Docker Hub) and the image name in `b2b.yml` |
 | `SRVUSER`, `SRVPASS`, `SRVHOST` | `push-db.sh` (server login) |
-| `SRVDB_LOCATION` (default `/opt/b2b`), `LOCADB_LOCATION` (default `data`), `DBNAME` (default `b2b.sqlite3`) | `push-db.sh` paths |
+| `SRVDB_LOCATION` (default `/opt/b2b/data`), `LOCADB_LOCATION` (default `data`), `DBNAME` (default `b2b.sqlite3`) | `push-db.sh` paths |
 
 Never put `CONFIRM_CAMPAIGN` in `.env`; give it on the command line for each launch.
 
@@ -28,14 +38,16 @@ Never put `CONFIRM_CAMPAIGN` in `.env`; give it on the command line for each lau
 ```
 
 Runs the tests, builds `<DOCKER_USERNAME>/b2b-outreach:latest`, checks the image holds no
-`.env`, database or `contactos/`, and pushes it. The server container is excluded from
-Watchtower on purpose (an automatic restart would interrupt a batch).
+`.env`, database or `contactos/`, and pushes it. The container is excluded from Watchtower on
+purpose (an automatic restart would interrupt a batch), so the server only changes image when you
+pull.
 
 ## 2. First-time server setup
 
 ```bash
-./push-db.sh                                   # uploads data/b2b.sqlite3 → /opt/b2b/b2b.sqlite3
-scp .env docker-compose.yml <SRVUSER>@<SRVHOST>:/opt/b2b/
+ssh <SRVUSER>@<SRVHOST> 'mkdir -p /opt/b2b/data'
+./push-db.sh                                   # data/b2b.sqlite3 → /opt/b2b/data/b2b.sqlite3
+scp .env b2b.yml <SRVUSER>@<SRVHOST>:/opt/b2b/
 ssh <SRVUSER>@<SRVHOST> 'chmod 600 /opt/b2b/.env'
 ```
 
@@ -48,16 +60,16 @@ copy over it.
 
 ```bash
 cd /opt/b2b
-docker compose pull
-CONFIRM_CAMPAIGN=primer-contacto-2026 docker compose up -d
-docker compose logs -f                         # confirmation block, waits, final summary
+docker compose -f b2b.yml pull
+CONFIRM_CAMPAIGN=primer-contacto-2026 docker compose -f b2b.yml up -d
+docker compose -f b2b.yml logs -f              # confirmation block, waits, final summary
 ```
 
-- DMARC not published yet: add `FORCE_NO_DMARC=1` before `docker compose up -d` (recorded in the
+- DMARC not published yet: put `FORCE_NO_DMARC=1` before `docker compose` (recorded in the
   database).
 - `CONFIRM_CAMPAIGN` must equal `name` in `config/campaign.toml`, otherwise nothing is sent.
-- Stop safely at any time with `docker compose stop` (the email in flight is never re-sent).
-- The container exits when the batch is done; you receive the summary email.
+- Stop safely at any time with `docker compose -f b2b.yml stop` (the email in flight is never re-sent).
+- The container exits when the batch is done and you receive the summary email.
 
 ## 4. After a batch (manual inbox check)
 
@@ -66,7 +78,7 @@ docker compose logs -f                         # confirmation block, waits, fina
 3. Record the check, which releases the batch hold:
 
    ```bash
-   cd /opt/b2b && docker compose run --rm b2b-outreach mark-inbox-checked
+   cd /opt/b2b && docker compose -f b2b.yml run --rm b2b-outreach mark-inbox-checked
    ```
 
 4. Launch the next batch (step 3).
@@ -74,7 +86,7 @@ docker compose logs -f                         # confirmation block, waits, fina
 ## Other commands
 
 ```bash
-docker compose run --rm b2b-outreach preview   # writes /opt/b2b/previews/… , sends nothing
+docker compose -f b2b.yml run --rm b2b-outreach preview   # writes /opt/b2b/data/previews/…, sends nothing
 ```
 
 From this machine: `.venv/bin/python -m b2b.send_first_email --mode test` sends synthetic samples

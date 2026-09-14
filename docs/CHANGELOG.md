@@ -2,6 +2,14 @@
 
 ## 2026-09-13
 
+- ops: server compose file renamed `docker-compose.yml` → `b2b.yml`, following the Mockba server
+  layout: `/opt/b2b/{b2b.yml,.env,data/}`, `.env` mounted read-only at `/app/.env` (not passed as
+  container environment), database in `/opt/b2b/data`. Kept `restart: "no"` and the Watchtower
+  label `false` (one batch per launch; no second Watchtower service). `docker-entrypoint.sh`
+  honours `ENV_FILE`; `push-db.sh` default target `/opt/b2b/data`; `deploy.sh`,
+  `.dockerignore`, `docs/deployment.md`, `.claude/CLAUDE.md`, spec 002 plan D23 and CLI
+  contract updated.
+
 - ops: unattended Docker runs and public repository (user request). Spec 003 (automatic inbox
   processing) deleted — inbox is checked manually. `send_first_email` send mode gains
   `--confirm`, `--wait-for-window`, `--notify` and SIGTERM handling; new

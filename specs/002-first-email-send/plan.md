@@ -210,7 +210,7 @@ server, and automatic inbox processing (spec 003) is dropped for now.
   (`kind = 'inbox'`, `stop_reason = 'manual_check'`), satisfying the FR-018 batch hold.
 - **D23 — Container and scripts**: `Dockerfile` (python:3.13-slim + tzdata; code and config only),
   `docker-entrypoint.sh` (`send` → `--mode send --confirm "$CONFIRM_CAMPAIGN" --wait-for-window
-  --notify [--force-no-dmarc]`; `preview`; `mark-inbox-checked`), `docker-compose.yml` for `/opt/b2b`
+  --notify [--force-no-dmarc]`; `preview`; `mark-inbox-checked`), `b2b.yml` compose file in `/opt/b2b` (database in `/opt/b2b/data`, `.env` mounted read-only)
   (`restart: "no"`, Watchtower disabled), `deploy.sh`, `push-db.sh`; runbook in `docs/deployment.md`.
 
 ## Project Structure

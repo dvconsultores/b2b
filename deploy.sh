@@ -7,7 +7,7 @@
 # Everything runs against the local Docker engine on this machine. The image holds code and
 # config only — never .env, contactos/ or data/ (see .dockerignore). The server container is
 # excluded from Watchtower on purpose (a restart would interrupt a batch), so after pushing,
-# update it between batches with:  cd /opt/b2b && docker compose pull
+# update it between batches with:  cd /opt/b2b && docker compose -f b2b.yml pull
 #
 # Docker Hub login uses DOCKER_USERNAME / DOCKER_PASSWORD from .env (password via
 # stdin — it never appears on a command line).
@@ -84,4 +84,4 @@ fi
 docker push "$IMAGE:latest"
 [[ "$COMMIT" != "unknown" ]] && docker push "$IMAGE:$COMMIT"
 
-echo "✅ pushed $IMAGE:latest — on the server, between batches:  cd /opt/b2b && docker compose pull"
+echo "✅ pushed $IMAGE:latest — on the server, between batches:  cd /opt/b2b && docker compose -f b2b.yml pull"

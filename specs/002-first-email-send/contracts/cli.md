@@ -115,7 +115,7 @@ is missing or its schema is newer than supported.
 
 | Command | Runs |
 |---------|------|
-| `send` (default) | `send_first_email --mode send --db /app/data/b2b.sqlite3 --env /app/data/.env --confirm "$CONFIRM_CAMPAIGN" --wait-for-window --notify` plus `--force-no-dmarc` when `FORCE_NO_DMARC=1`; exit 3 when `CONFIRM_CAMPAIGN` is empty |
+| `send` (default) | `send_first_email --mode send --db /app/data/b2b.sqlite3 --env "$ENV_FILE"` (default `/app/data/.env`; `b2b.yml` sets `/app/.env`) `--confirm "$CONFIRM_CAMPAIGN" --wait-for-window --notify` plus `--force-no-dmarc` when `FORCE_NO_DMARC=1`; exit 3 when `CONFIRM_CAMPAIGN` is empty |
 | `preview` | preview mode, previews in `/app/data/previews` |
 | `mark-inbox-checked` | `mark_inbox_checked --db /app/data/b2b.sqlite3` |
 | anything else | executed as given |

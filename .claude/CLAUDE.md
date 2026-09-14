@@ -31,7 +31,7 @@
   `fix:`, `docs:`, `ops:`); stage only the task's files; list every changed file
   in the report and add an entry to `docs/CHANGELOG.md`.
 - **Deployment:** `./deploy.sh` (tests, build, push image), `./push-db.sh` (upload
-  the tracker DB to `/opt/b2b`), server `docker-compose.yml`; see
+  the tracker DB to `/opt/b2b/data`), server compose file `b2b.yml`; see
   `docs/deployment.md`. Spec 003 (automatic inbox processing) was dropped for now:
   the operator checks the inbox by hand and runs `python -m b2b.mark_inbox_checked`.
 

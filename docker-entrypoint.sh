@@ -13,7 +13,7 @@ set -euo pipefail
 
 DATA_DIR="${DATA_DIR:-/app/data}"
 DB="$DATA_DIR/b2b.sqlite3"
-ENV_FILE="$DATA_DIR/.env"
+ENV_FILE="${ENV_FILE:-$DATA_DIR/.env}"
 
 case "${1:-send}" in
     send)
