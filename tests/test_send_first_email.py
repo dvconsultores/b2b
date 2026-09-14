@@ -15,7 +15,7 @@ import pytest
 from b2b import tracking
 from b2b.send_first_email import main
 
-CAMPAIGN = "primer-contacto-2026"
+CAMPAIGN = "primer-contacto-2026-b"
 
 BASE_CONTACTS = [
     {"email": "ana@example.com", "company": "INVERSIONES UNO, C.A.", "company_key": "n:inversiones uno",

@@ -61,7 +61,8 @@ def load(tmp_path: Path, text: str) -> Campaign:
 def test_real_config_loads() -> None:
     campaign = load_campaign(REAL_CONFIG)
     assert isinstance(campaign, Campaign)
-    assert campaign.name == "primer-contacto-2026"
+    assert campaign.name == "primer-contacto-2026-b"
+    assert campaign.allowed_verification == ("valid",)
     assert campaign.step == 1
     assert campaign.template == Path("config/templates/primer_contacto.txt")
     assert campaign.launch_price_end == date(2026, 12, 31)
@@ -84,6 +85,27 @@ def test_valid_synthetic_loads(tmp_path: Path) -> None:
     assert campaign.name == "primer-contacto-2026"
     assert campaign.phrases.greeting_with_name == "Hola {nombre},"
     assert campaign.test_sample.ciudad == "Caracas"
+    assert campaign.allowed_verification == ("valid",)
+
+
+def test_allowed_verification_list(tmp_path: Path) -> None:
+    text = VALID.replace("test_sample_count = 3\n", 'test_sample_count = 3\nallowed_verification = ["valid", "catch_all"]\n')
+    assert load(tmp_path, text).allowed_verification == ("valid", "catch_all")
+
+
+@pytest.mark.parametrize("literal, problem", [
+    ('"valid"', "has the wrong type"),
+    ("[1]", "has the wrong type"),
+    ("[]", "is invalid"),
+    ('["valid", "valid"]', "is invalid"),
+    ('["invalid"]', "is invalid"),
+    ('["unverified"]', "is invalid"),
+])
+def test_bad_allowed_verification(tmp_path: Path, literal: str, problem: str) -> None:
+    path = write(tmp_path, VALID.replace("test_sample_count = 3\n", f"test_sample_count = 3\nallowed_verification = {literal}\n"))
+    with pytest.raises(ConfigError) as excinfo:
+        load_campaign(path)
+    assert str(excinfo.value) == f"{path}: 'allowed_verification' {problem}"
 
 
 def test_invalid_toml(tmp_path: Path) -> None:

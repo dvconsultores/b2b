@@ -1,5 +1,5 @@
-"""SQLite contact store: schema v1 contacts, v2 send tracking, and an upsert that never
-touches tracking fields (spec 001 plan D10, spec 002 plan D3)."""
+"""SQLite contact store: schema v1 contacts, v2 send tracking, v3 email verification, and an
+upsert that never touches tracking fields (spec 001 plan D10, spec 002 plan D3, spec 004 plan D1)."""
 from __future__ import annotations
 
 import sqlite3
@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Sequence
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+
+VERIFICATION_STATUSES = ("unverified", "valid", "catch_all", "unknown", "invalid")
 
 # Columns the import may write on an existing contact. Tracking columns and created_at are
 # deliberately absent: only specs 002 and 003 change them.
@@ -180,6 +182,17 @@ def _migrate_1_to_2(conn: sqlite3.Connection) -> None:
         conn.execute("PRAGMA user_version = 2")
 
 
+def _migrate_2_to_3(conn: sqlite3.Connection) -> None:
+    statuses = ", ".join(f"'{status}'" for status in VERIFICATION_STATUSES)
+    with transaction(conn):
+        conn.execute(
+            "ALTER TABLE contacts ADD COLUMN verification TEXT NOT NULL DEFAULT 'unverified' "
+            f"CHECK (verification IN ({statuses}))"
+        )
+        conn.execute("ALTER TABLE contacts ADD COLUMN verified_at TEXT")
+        conn.execute("PRAGMA user_version = 3")
+
+
 def ensure_schema(conn: sqlite3.Connection) -> None:
     version = conn.execute("PRAGMA user_version").fetchone()[0]
     if version > SCHEMA_VERSION:
@@ -202,6 +215,9 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         version = 1
     if version == 1:
         _migrate_1_to_2(conn)
+        version = 2
+    if version == 2:
+        _migrate_2_to_3(conn)
 
 
 def existing_emails(conn: sqlite3.Connection) -> set[str]:

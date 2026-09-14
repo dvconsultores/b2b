@@ -2,6 +2,19 @@
 
 ## 2026-09-14
 
+- feat: spec 004 email verification (`specs/004-email-verification`), chosen by the user after the
+  first batch ended at 61 accepted / 11 bounced (18%, run interrupted). Constitution 1.2.0 → 1.3.0
+  (IV: email addresses only may go to NeverBounce or ZeroBounce). Schema v3
+  (`contacts.verification`, `verified_at`). New `python -m b2b.export_verification` (emails-only
+  CSV, 600) and `python -m b2b.import_verification RESULTS.csv [--dry-run]`; Docker commands
+  `export-verification`, `import-verification`. Campaigns send only to `allowed_verification`
+  (default `["valid"]`); summary line `skipped not verified`; a company that received the first
+  email in any campaign is excluded. Campaign renamed `primer-contacto-2026-b`. Local database copy
+  check: migration OK, counts only. Docs: CLI contract, `docs/deployment.md`, `b2b.yml`,
+  `.claude/CLAUDE.md`.
+- ops: server bounce sync after the stop: 22 suppressed, 11 contacts newly bounced; manual inbox
+  check recorded.
+
 - ops: first production batch stopped by the operator after the SES API showed 65 attempts and
   10 bounces (15.4%) on 2026-09-14; the SMTP-time pause rule could not see asynchronous bounces.
 - feat: spec 003 SES bounce guard (`specs/003-ses-bounce-guard`). New `b2b/ses_api.py` (read-only

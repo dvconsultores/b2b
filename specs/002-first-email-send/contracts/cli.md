@@ -64,6 +64,7 @@ Counts only. Each value line is `"  " + f"{label + ':':<26}" + value`.
 send_first_email: <mode> <result>
 campaign: <name> (step <n>)
   eligible contacts:        <n>
+  skipped not verified:     <n>      (spec 004)
   skipped same company:     <n>
   skipped rendered link:    <n>
   selected:                 <n>
@@ -121,6 +122,8 @@ is missing or its schema is newer than supported.
 | `import` | only `import_contacts --clients /app/contactos/$CLIENTS_FILE --yearbook /app/contactos/$YEARBOOK_FILE --db /app/data/b2b.sqlite3 --reports-dir /app/data/reports --config-dir /app/config` |
 | `mark-inbox-checked` | `mark_inbox_checked --db /app/data/b2b.sqlite3` |
 | `sync-bounces [--dry-run]` | `sync_bounces --db /app/data/b2b.sqlite3 --env "$ENV_FILE"` (spec 003) |
+| `export-verification` | `export_verification --db /app/data/b2b.sqlite3 --out-dir /app/data/verification` (spec 004) |
+| `import-verification <file> [options]` | `import_verification <file> --db /app/data/b2b.sqlite3`; relative names resolve to `/app/data/verification/` (spec 004) |
 | anything else | executed as given |
 
 Import on start: when `IMPORT_ON_START=1` (default), `send` and `preview` run the `import` step first.

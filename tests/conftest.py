@@ -18,7 +18,7 @@ from b2b.store import ContactValues
 ROOT = Path(__file__).resolve().parents[1]
 
 TRACKING_KEYS = ("times_contacted", "last_contacted_at", "bounced", "bounced_at", "responded",
-                 "responded_at", "opted_out", "opted_out_at")
+                 "responded_at", "opted_out", "opted_out_at", "verification", "verified_at")
 
 
 def _network_disabled(*args, **kwargs):
@@ -241,6 +241,8 @@ def contacts_db(db_path):
             for row in rows:
                 contact_id = conn.execute("SELECT id FROM contacts WHERE email = ?", (row["email"],)).fetchone()[0]
                 tracking = {k: v for k, v in row.items() if k in TRACKING_KEYS}
+                if "verification" not in tracking:  # spec 004: synthetic contacts are verified unless a test says otherwise
+                    tracking.update(verification="valid", verified_at="2026-09-13T12:00:00Z")
                 if tracking:
                     assignments = ", ".join(f"{k} = ?" for k in tracking)
                     conn.execute(f"UPDATE contacts SET {assignments} WHERE id = ?", (*tracking.values(), contact_id))

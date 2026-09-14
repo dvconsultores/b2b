@@ -35,9 +35,9 @@ def test_golden_layout(tmp_path: Path) -> None:
 
     path = write_preview(tmp_path, campaign, emails, _generated_at())
 
-    assert path.name == "primer-contacto-2026-20260914-090509.txt"
+    assert path.name == "primer-contacto-2026-b-20260914-090509.txt"
     expected = (
-        "Campaign: primer-contacto-2026 (step 1)\n"
+        "Campaign: primer-contacto-2026-b (step 1)\n"
         "Generated: 2026-09-14 09:05 America/Caracas\n"
         "Emails: 2\n"
         "\n"
@@ -70,8 +70,8 @@ def test_name_collision_suffix(tmp_path: Path) -> None:
     first = write_preview(tmp_path, campaign, emails, _generated_at())
     second = write_preview(tmp_path, campaign, emails, _generated_at())
 
-    assert first.name == "primer-contacto-2026-20260914-090509.txt"
-    assert second.name == "primer-contacto-2026-20260914-090509-2.txt"
+    assert first.name == "primer-contacto-2026-b-20260914-090509.txt"
+    assert second.name == "primer-contacto-2026-b-20260914-090509-2.txt"
     assert second.parent == tmp_path
 
 
@@ -82,7 +82,7 @@ def test_zero_emails_writes_header_only(tmp_path: Path) -> None:
 
     content = path.read_text(encoding="utf-8")
     assert content == (
-        "Campaign: primer-contacto-2026 (step 1)\n"
+        "Campaign: primer-contacto-2026-b (step 1)\n"
         "Generated: 2026-09-14 09:05 America/Caracas\n"
         "Emails: 0\n"
     )

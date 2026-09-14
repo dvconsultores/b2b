@@ -1,8 +1,10 @@
-"""Select first-email recipients: one eligible personal contact per company (spec 002 plan D8)."""
+"""Select first-email recipients: one eligible, verified personal contact per company
+(spec 002 plan D8, spec 004 plan D3)."""
 from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+from typing import Sequence
 
 
 @dataclass(frozen=True)
@@ -21,15 +23,16 @@ class Selection:
     recipients: list[Recipient]
     eligible: int
     skipped_same_company: int
+    skipped_not_verified: int = 0
 
 
 # A contact is a candidate when it was never contacted, never bounced, responded or opted out,
 # is personal, has no attempt in this campaign step, and has no unresolved (pending/unknown)
 # attempt anywhere. A company is excluded once any of its contacts was (or may have been)
-# emailed in this campaign step.
+# emailed at this step in any campaign, so a company never receives the same first email twice.
 _CANDIDATES = """
 SELECT c.id, c.email, c.company, c.company_key, c.contact_name, c.city, c.tax_id, c.area,
-       c.source_year, c.source_row
+       c.source_year, c.source_row, c.verification
 FROM contacts c
 WHERE c.times_contacted = 0
   AND c.bounced = 0
@@ -43,21 +46,24 @@ WHERE c.times_contacted = 0
   )
   AND NOT EXISTS (
       SELECT 1 FROM send_attempts a JOIN contacts other ON other.id = a.contact_id
-      WHERE a.campaign = :campaign
-        AND a.step = :step
+      WHERE a.step = :step
         AND a.status IN ('accepted', 'pending', 'unknown')
         AND other.company_key = c.company_key
   )
+ORDER BY c.id
 """
 
 
-def select_recipients(conn: sqlite3.Connection, campaign: str, step: int) -> Selection:
+def select_recipients(conn: sqlite3.Connection, campaign: str, step: int,
+                      allowed_verification: Sequence[str] = ("valid",)) -> Selection:
     rows = conn.execute(_CANDIDATES, {"campaign": campaign, "step": step}).fetchall()
+    allowed = set(allowed_verification)
+    verified = [row for row in rows if row["verification"] in allowed]
 
     best_by_company: dict[str, tuple] = {}
-    for row in rows:
+    for row in verified:
         (contact_id, email, company, company_key, contact_name, city, tax_id, area,
-         source_year, source_row) = tuple(row)
+         source_year, source_row, _verification) = tuple(row)
         completeness = sum(1 for value in (company, contact_name, city, tax_id, area) if value)
         rank = (-completeness, -source_year, source_row, email)
         current = best_by_company.get(company_key)
@@ -71,6 +77,13 @@ def select_recipients(conn: sqlite3.Connection, campaign: str, step: int) -> Sel
     )
     return Selection(
         recipients=chosen,
-        eligible=len(rows),
-        skipped_same_company=len(rows) - len(chosen),
+        eligible=len(verified),
+        skipped_same_company=len(verified) - len(chosen),
+        skipped_not_verified=len(rows) - len(verified),
     )
+
+
+def verification_candidates(conn: sqlite3.Connection, step: int = 1) -> list[str]:
+    """Emails worth verifying: would be eligible for a new first-email campaign and were never verified."""
+    rows = conn.execute(_CANDIDATES, {"campaign": "", "step": step}).fetchall()
+    return [row["email"] for row in rows if row["verification"] == "unverified"]

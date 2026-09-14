@@ -1,6 +1,6 @@
-"""Tests for first-email recipient selection (spec 002 plan D8)."""
+"""Tests for first-email recipient selection (spec 002 plan D8, spec 004 plan D3)."""
 from b2b import store
-from b2b.eligibility import select_recipients
+from b2b.eligibility import select_recipients, verification_candidates
 
 CAMPAIGN = "primer-contacto-2026"
 
@@ -102,15 +102,60 @@ def test_temporary_failure_at_company_does_not_exclude_colleague(contacts_db, db
     assert _emails(select_recipients(conn, CAMPAIGN, 1)) == ["colleague@example.com"]
 
 
-def test_company_attempt_in_other_campaign_does_not_exclude(contacts_db, db_path):
+def test_company_emailed_in_other_campaign_is_excluded(contacts_db, db_path):
     ids = contacts_db([
         {"email": "sent@example.com", "company_key": "n:empresa", "times_contacted": 1,
          "last_contacted_at": "2026-09-14T13:01:00Z"},
         {"email": "colleague@example.com", "company_key": "n:empresa"},
+        {"email": "other@example.com", "company_key": "n:otra"},
     ])
     conn = _conn(db_path)
     _attempt(conn, ids[0], "accepted", campaign="otra-campana")
-    assert _emails(select_recipients(conn, CAMPAIGN, 1)) == ["colleague@example.com"]
+    assert _emails(select_recipients(conn, CAMPAIGN, 1)) == ["other@example.com"]
+
+
+def test_only_allowed_verification_statuses_are_selected(contacts_db, db_path):
+    contacts_db([
+        {"email": "valid@example.com", "company_key": "n:a"},
+        {"email": "catch@example.com", "company_key": "n:b", "verification": "catch_all",
+         "verified_at": "2026-09-15T00:00:00Z"},
+        {"email": "invalid@example.com", "company_key": "n:c", "verification": "invalid",
+         "verified_at": "2026-09-15T00:00:00Z"},
+        {"email": "never@example.com", "company_key": "n:d", "verification": "unverified"},
+    ])
+    conn = _conn(db_path)
+    selection = select_recipients(conn, CAMPAIGN, 1)
+    assert _emails(selection) == ["valid@example.com"]
+    assert (selection.eligible, selection.skipped_not_verified) == (1, 3)
+    wider = select_recipients(conn, CAMPAIGN, 1, ("valid", "catch_all"))
+    assert _emails(wider) == ["valid@example.com", "catch@example.com"]
+
+
+def test_invalid_best_contact_falls_back_to_verified_colleague(contacts_db, db_path):
+    contacts_db([
+        {"email": "best@example.com", "company_key": "n:empresa", "contact_name": "Ana",
+         "verification": "invalid", "verified_at": "2026-09-15T00:00:00Z"},
+        {"email": "colleague@example.com", "company_key": "n:empresa"},
+    ])
+    assert _emails(select_recipients(_conn(db_path), CAMPAIGN, 1)) == ["colleague@example.com"]
+
+
+def test_verification_candidates(contacts_db, db_path):
+    ids = contacts_db([
+        {"email": "new@example.com", "company_key": "n:a", "verification": "unverified"},
+        {"email": "done@example.com", "company_key": "n:b"},
+        {"email": "bounced@example.com", "company_key": "n:c", "verification": "unverified",
+         "bounced": 1, "bounced_at": "2026-09-14T00:00:00Z"},
+        {"email": "generic@example.com", "company_key": "n:d", "verification": "unverified",
+         "classification": "generic"},
+        {"email": "sent@example.com", "company_key": "n:e", "verification": "unverified",
+         "times_contacted": 1, "last_contacted_at": "2026-09-14T13:01:00Z"},
+        {"email": "colleague@example.com", "company_key": "n:e", "verification": "unverified"},
+        {"email": "second@example.com", "company_key": "n:a", "verification": "unverified"},
+    ])
+    conn = _conn(db_path)
+    _attempt(conn, ids[4], "accepted", campaign="otra-campana")
+    assert verification_candidates(conn) == ["new@example.com", "second@example.com"]
 
 
 def test_one_per_company_tie_breaks(contacts_db, db_path):

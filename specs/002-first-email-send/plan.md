@@ -98,7 +98,8 @@ production batch 100
 - **D7 — Launch-price date**: "today" is the current date in `campaign.timezone`. Preview, test
   and send refuse to start (exit 1) when today > `launch_price_end`; a production loop stops
   (`launch_price_ended`) before the next email once it passes.
-- **D8 — Eligibility**: candidates are contacts with `times_contacted = 0`, `bounced = 0`,
+- **D8 — Eligibility** (amended by spec 004 D3: only allowed verification statuses, and company
+  exclusion across all campaigns): candidates are contacts with `times_contacted = 0`, `bounced = 0`,
   `responded = 0`, `opted_out = 0`, `classification = 'personal'`, no attempt for this
   campaign and step, and no attempt with status `pending` or `unknown` in any campaign.
   Companies are excluded when any contact with the same `company_key` has an attempt in this

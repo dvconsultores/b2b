@@ -10,6 +10,7 @@ class SendSummary:
     campaign: str
     step: int
     eligible: int = 0
+    skipped_not_verified: int = 0
     skipped_same_company: int = 0
     skipped_rendered_link: int = 0
     selected: int = 0
@@ -38,6 +39,7 @@ def format_send_summary(summary: SendSummary) -> str:
         f"send_first_email: {summary.mode} {summary.result}",
         f"campaign: {summary.campaign} (step {summary.step})",
         "  " + f"{'eligible contacts:':<26}" + str(summary.eligible),
+        "  " + f"{'skipped not verified:':<26}" + str(summary.skipped_not_verified),
         "  " + f"{'skipped same company:':<26}" + str(summary.skipped_same_company),
         "  " + f"{'skipped rendered link:':<26}" + str(summary.skipped_rendered_link),
         "  " + f"{'selected:':<26}" + str(summary.selected),

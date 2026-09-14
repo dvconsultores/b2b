@@ -180,7 +180,7 @@ def _open_database(db_path: Path) -> sqlite3.Connection | None:
 
 def _render_batch(campaign: Campaign, template: Template, settings: SenderSettings, conn: sqlite3.Connection,
                   summary: SendSummary) -> list[RenderedEmail]:
-    selection = select_recipients(conn, campaign.name, campaign.step)
+    selection = select_recipients(conn, campaign.name, campaign.step, campaign.allowed_verification)
     emails: list[RenderedEmail] = []
     for recipient in selection.recipients:
         email = render(
@@ -199,6 +199,7 @@ def _render_batch(campaign: Campaign, template: Template, settings: SenderSettin
         emails.append(email)
     batch = emails[: campaign.batch_limit]
     summary.eligible = selection.eligible
+    summary.skipped_not_verified = selection.skipped_not_verified
     summary.skipped_same_company = selection.skipped_same_company
     summary.selected = len(batch)
     return batch

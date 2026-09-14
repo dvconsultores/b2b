@@ -54,6 +54,32 @@ into the database (bounces → bounced, complaints → opted out) and checks the
 - The campaign's own 2% rule also sees the synced bounces, so a campaign that bounced badly stays
   paused until you decide what to do with the list.
 
+## Email verification (before every new campaign)
+
+The first campaign bounced at 18%: the domain check cannot tell whether a mailbox still exists.
+Campaigns now send only to addresses a verification service confirmed (`allowed_verification`
+in `config/campaign.toml`, default `["valid"]`). Only the email addresses leave the server
+(spec 004, constitution 1.3.0).
+
+```bash
+# 1. server: export the addresses that still need verifying (emails only)
+cd /opt/b2b && docker compose -f b2b.yml run --rm b2b-outreach export-verification
+#    → data/verification/verify-emails-<time>.csv  (count printed)
+
+# 2. this machine: download it, upload to NeverBounce or ZeroBounce (web), download the results CSV
+scp <SRVUSER>@<SRVHOST>:/opt/b2b/data/verification/verify-emails-<time>.csv ~/
+scp ~/results.csv <SRVUSER>@<SRVHOST>:/opt/b2b/data/verification/results.csv
+rm ~/verify-emails-<time>.csv ~/results.csv          # do not keep copies around
+
+# 3. server: import (dry run first)
+docker compose -f b2b.yml run --rm b2b-outreach import-verification results.csv --dry-run
+docker compose -f b2b.yml run --rm b2b-outreach import-verification results.csv
+```
+
+If the results file uses other column names, add `--email-column NAME --status-column NAME`.
+After importing, run `preview` and check `eligible contacts` and `skipped not verified`.
+A company that already received the first email is never emailed again, in any campaign.
+
 ## 1. Publish the image (this machine)
 
 ```bash
@@ -89,7 +115,7 @@ cd /opt/b2b && docker compose -f b2b.yml run --rm b2b-outreach preview
 ```bash
 cd /opt/b2b
 docker compose -f b2b.yml pull
-CONFIRM_CAMPAIGN=primer-contacto-2026 docker compose -f b2b.yml up -d
+CONFIRM_CAMPAIGN=primer-contacto-2026-b docker compose -f b2b.yml up -d
 docker compose -f b2b.yml logs -f              # import summary, confirmation block, waits, final summary
 ```
 

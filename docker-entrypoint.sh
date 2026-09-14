@@ -11,6 +11,9 @@
 #   import               only import contactos/ into the database (creates it on first run)
 #   mark-inbox-checked   record the manual inbox check (releases the batch hold)
 #   sync-bounces [--dry-run]  mark SES-suppressed addresses bounced / opted out in the database
+#   export-verification  write data/verification/verify-emails-<time>.csv (emails only) for the verification service
+#   import-verification <file> [--dry-run] [--status-column NAME]
+#                        read the service's results CSV from data/verification/ into the database
 #
 # send always runs with --ses-guard: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION
 # (read-only SES key) must be in .env.
@@ -84,6 +87,18 @@ case "${1:-send}" in
         ;;
     sync-bounces)
         exec python -m b2b.sync_bounces --db "$DB" --env "$ENV_FILE" "${@:2}"
+        ;;
+    export-verification)
+        exec python -m b2b.export_verification --db "$DB" --out-dir "$DATA_DIR/verification"
+        ;;
+    import-verification)
+        results="${2:-}"
+        if [[ -z "$results" ]]; then
+            echo "import_verification: error: give the results file name (in data/verification/)" >&2
+            exit 1
+        fi
+        [[ "$results" == /* ]] || results="$DATA_DIR/verification/$results"
+        exec python -m b2b.import_verification "$results" --db "$DB" "${@:3}"
         ;;
     *)
         exec "$@"

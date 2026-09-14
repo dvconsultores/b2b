@@ -35,6 +35,7 @@ _TOP_KEYS = (
     "bounce_min_sends",
     "temporary_failure_limit",
     "test_sample_count",
+    "allowed_verification",
     "phrases",
     "test_sample",
 )
@@ -61,7 +62,11 @@ _DEFAULTS = {
     "bounce_min_sends": 20,
     "temporary_failure_limit": 3,
     "test_sample_count": 3,
+    "allowed_verification": ["valid"],
 }
+
+# Verification results a campaign may send to; "invalid" and "unverified" never qualify.
+_SENDABLE_VERIFICATION = ("valid", "catch_all", "unknown")
 
 _PHRASE_FIELDS = {
     "greeting_with_name": {"nombre"},
@@ -112,6 +117,7 @@ class Campaign:
     test_sample_count: int
     phrases: Phrases
     test_sample: TestSample
+    allowed_verification: tuple[str, ...] = ("valid",)
 
 
 def _is_int(value: object) -> bool:
@@ -278,6 +284,18 @@ def load_campaign(path: Path) -> Campaign:
     if not 1 <= test_sample_count <= 3:
         raise ConfigError(f"{path}: 'test_sample_count' is invalid")
 
+    allowed_verification = data.get("allowed_verification", _DEFAULTS["allowed_verification"])
+    if not isinstance(allowed_verification, list) or not all(
+        isinstance(status, str) for status in allowed_verification
+    ):
+        raise ConfigError(f"{path}: 'allowed_verification' has the wrong type")
+    if (
+        not allowed_verification
+        or len(set(allowed_verification)) != len(allowed_verification)
+        or any(status not in _SENDABLE_VERIFICATION for status in allowed_verification)
+    ):
+        raise ConfigError(f"{path}: 'allowed_verification' is invalid")
+
     phrases_table = data["phrases"]
     phrase_values: dict[str, str] = {}
     for key in _PHRASES_KEYS:
@@ -311,4 +329,5 @@ def load_campaign(path: Path) -> Campaign:
         test_sample_count=test_sample_count,
         phrases=phrases,
         test_sample=test_sample,
+        allowed_verification=tuple(allowed_verification),
     )

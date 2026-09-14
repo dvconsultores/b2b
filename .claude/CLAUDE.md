@@ -37,7 +37,9 @@
   `docs/deployment.md`. Automatic inbox reading was dropped; spec 003
   (`specs/003-ses-bounce-guard`) syncs bounces and complaints from the SES API instead
   (`b2b.sync_bounces`, `send_first_email --ses-guard`, read-only `AWS_*` keys). Replies are
-  still checked by hand, then `python -m b2b.mark_inbox_checked`.
+  still checked by hand, then `python -m b2b.mark_inbox_checked`. Spec 004
+  (`specs/004-email-verification`, schema v3) exports email addresses only for NeverBounce /
+  ZeroBounce and imports the results; campaigns send only to `allowed_verification`.
 
 ## Role Assignment (Non-Negotiable)
 

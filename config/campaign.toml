@@ -1,4 +1,4 @@
-name = "primer-contacto-2026"
+name = "primer-contacto-2026-b"
 step = 1
 template = "config/templates/primer_contacto.txt"
 launch_price_end = 2026-12-31
@@ -12,6 +12,7 @@ bounce_pause_threshold = 0.02
 bounce_min_sends = 20
 temporary_failure_limit = 3
 test_sample_count = 3
+allowed_verification = ["valid"]
 
 [phrases]
 greeting_with_name = "Hola {nombre},"

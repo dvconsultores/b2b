@@ -33,6 +33,7 @@ def test_format_send_summary_golden():
         "send_first_email: send done\n"
         "campaign: primer-contacto-2026 (step 1)\n"
         "  eligible contacts:" + " " * 8 + "120\n"
+        "  skipped not verified:" + " " * 5 + "0\n"
         "  skipped same company:" + " " * 5 + "7\n"
         "  skipped rendered link:" + " " * 4 + "3\n"
         "  selected:" + " " * 17 + "110\n"

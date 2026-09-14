@@ -1,6 +1,12 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.2.0 (2026-09-13, MINOR)
+- Version change: 1.2.0 → 1.3.0 (2026-09-14, MINOR)
+  - IV. Contact Data Stays Local: email addresses alone (no other field) may be uploaded by the
+    operator to the email verification service approved in spec 004 (NeverBounce or ZeroBounce)
+    to check that mailboxes exist before sending. Requested by the user after the first batch
+    bounced at 18%.
+  - Templates: no template changes needed.
+- Previous: 1.1.0 → 1.2.0 (2026-09-13, MINOR)
   - IV. Contact Data Stays Local: contact data may also be stored and processed on the
     operator's own server (spreadsheets, database) for unattended runs.
   - Templates: no template changes needed.
@@ -67,9 +73,13 @@ filtered as bulk marketing (docs/plan.md §2).
 - `contactos/` and every file derived from it are real personal data. They are processed only on
   this machine and on the operator's own server (copied there over SSH, with restricted file
   permissions), and otherwise leave them only as an individual email to that recipient through
-  the configured email provider.
+  the configured email provider, or as permitted in the next two rules.
 - Contact data MUST NOT be sent to AI providers or other third-party services unless a spec
   explicitly approves a named service and purpose.
+- Email verification (spec 004): the operator may upload a file of email addresses only — no
+  names, companies, cities or other fields — to NeverBounce or ZeroBounce to check that the
+  mailboxes exist before any campaign sends to them. The export and results files stay under
+  `data/` with owner-only permissions.
 - Code, tests, fixtures, docs and specs contain only column headers, aggregate counts and
   synthetic data (for example `ana@example.com`).
 - Credentials live only in `.env` and are never printed, logged or copied elsewhere.
@@ -133,4 +143,4 @@ Rationale: a one-person outreach tool has to be understandable and checkable at 
   sections, PATCH for clarifications.
 - Compliance is checked in every plan's Constitution Check and in the audit of every task.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.3.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-14

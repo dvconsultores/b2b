@@ -22,6 +22,7 @@ EXPECTED_COLUMNS = [
     "classification", "source_file", "source_sheet", "source_row", "source_year",
     "times_contacted", "last_contacted_at", "bounced", "bounced_at", "responded",
     "responded_at", "opted_out", "opted_out_at", "created_at", "updated_at",
+    "verification", "verified_at",
 ]
 
 RUN_COLUMNS = ["id", "kind", "campaign", "step", "started_at", "finished_at", "stop_reason", "forced_no_dmarc"]
@@ -94,9 +95,9 @@ def test_connect_creates_parent_directory(db_path):
     assert db_path.parent.is_dir()
 
 
-def test_fresh_database_gets_schema_v2(db_path):
+def test_fresh_database_gets_schema_v3(db_path):
     conn = _open(db_path)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
     assert _columns(conn, "contacts") == EXPECTED_COLUMNS
     assert _columns(conn, "runs") == RUN_COLUMNS
     assert _columns(conn, "send_attempts") == ATTEMPT_COLUMNS
@@ -108,7 +109,22 @@ def test_fresh_database_gets_schema_v2(db_path):
 def test_ensure_schema_is_idempotent(db_path):
     conn = _open(db_path)
     store.ensure_schema(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+
+
+def test_v2_database_migrates_to_unverified(db_path):
+    conn = store.connect(db_path)
+    conn.execute(store._CREATE_CONTACTS)
+    conn.execute(store._CREATE_COMPANY_KEY_INDEX)
+    conn.execute("PRAGMA user_version = 1")
+    store._migrate_1_to_2(conn)
+    _insert_minimal(conn, bounced=1, bounced_at="2026-09-02T00:00:00Z")
+    before = tuple(conn.execute("SELECT * FROM contacts").fetchone())
+    store.ensure_schema(conn)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert tuple(conn.execute("SELECT * FROM contacts").fetchone()) == (*before, "unverified", None)
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("UPDATE contacts SET verification = 'maybe'")
 
 
 def test_v1_database_migrates_keeping_contacts(db_path):
@@ -120,15 +136,15 @@ def test_v1_database_migrates_keeping_contacts(db_path):
                     bounced=1, bounced_at="2026-09-02T00:00:00Z")
     before = tuple(conn.execute("SELECT * FROM contacts").fetchone())
     store.ensure_schema(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
-    assert tuple(conn.execute("SELECT * FROM contacts").fetchone()) == before
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert tuple(conn.execute("SELECT * FROM contacts").fetchone())[: len(before)] == before
     assert _columns(conn, "send_attempts") == ATTEMPT_COLUMNS
 
 
 def test_newer_schema_version_is_refused(db_path):
     conn = store.connect(db_path)
-    conn.execute("PRAGMA user_version = 3")
-    with pytest.raises(store.SchemaError, match="schema version 3 is newer than this tool"):
+    conn.execute("PRAGMA user_version = 4")
+    with pytest.raises(store.SchemaError, match="schema version 4 is newer than this tool"):
         store.ensure_schema(conn)
 
 
