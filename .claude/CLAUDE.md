@@ -34,8 +34,10 @@
   (`IMPORT_ON_START=1`), then sends one batch. `./push-contactos.sh` uploads the spreadsheets
   to `/opt/b2b/contactos`; `.env.example` lists every key. `./deploy.sh` (tests, build, push image), `./push-db.sh` (upload
   the tracker DB to `/opt/b2b/data`), server compose file `b2b.yml`; see
-  `docs/deployment.md`. Spec 003 (automatic inbox processing) was dropped for now:
-  the operator checks the inbox by hand and runs `python -m b2b.mark_inbox_checked`.
+  `docs/deployment.md`. Automatic inbox reading was dropped; spec 003
+  (`specs/003-ses-bounce-guard`) syncs bounces and complaints from the SES API instead
+  (`b2b.sync_bounces`, `send_first_email --ses-guard`, read-only `AWS_*` keys). Replies are
+  still checked by hand, then `python -m b2b.mark_inbox_checked`.
 
 ## Role Assignment (Non-Negotiable)
 
@@ -145,7 +147,7 @@ If unsure whether a task qualifies, **ask the user** before delegating or implem
 DeepSeek is an external provider. Never send it any `.env*` file, `*.log`, or
 values of `HOST_EMAIL`, `PORT_EMAIL`, `USER_EMAIL`, `PASS_EMAIL`, `SENDER_EMAIL`,
 `SMTP_FROM_NAME`, `TEST_RECIPIENTS`, `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `SRVUSER`,
-`SRVPASS`, `SRVHOST`. Never send real contact data: rows or cells from
+`SRVPASS`, `SRVHOST`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. Never send real contact data: rows or cells from
 `contactos/*.xls` / `*.xlsx` or any CSV/JSON exported from them, anything under
 `data/` (the contact database and its reports), send/bounce reports, or real names, emails, phone numbers, addresses or company names of
 clients. Column headers and synthetic sample rows are allowed. The executor

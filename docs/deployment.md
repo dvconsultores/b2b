@@ -38,8 +38,21 @@ See `.env.example` for the full list.
 | `SRVCONTACTOS_LOCATION` (default `/opt/b2b/contactos`) | `push-contactos.sh` target |
 | `SRVDB_LOCATION` (default `/opt/b2b/data`), `LOCADB_LOCATION` (default `data`), `DBNAME` (default `b2b.sqlite3`) | `push-db.sh` paths |
 | `IMPORT_ON_START` (default `1`), `CLIENTS_FILE`, `YEARBOOK_FILE` | container start: import before sending |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | read-only SES key: bounce sync and the send guard (**required** for `send`) |
 
 Never put `CONFIRM_CAMPAIGN` in `.env`; give it on the command line for each launch.
+
+## Bounce guard (SES API)
+
+SES accepts every email at SMTP time and reports bounces later, so `send` always runs with the
+SES guard (spec 003): before starting and before every email it copies the SES suppression list
+into the database (bounces → bounced, complaints → opted out) and checks the real bounce rate.
+
+- More than 2% bounces in the last 24 hours (at least 20 sends) → the run does not start (exit 3).
+- More than 2% since the run started → it stops before the next email (`ses_bounce_rate`).
+- SES API unreachable → it stops instead of sending blind (`ses_check_failed`).
+- The campaign's own 2% rule also sees the synced bounces, so a campaign that bounced badly stays
+  paused until you decide what to do with the list.
 
 ## 1. Publish the image (this machine)
 
@@ -88,8 +101,14 @@ docker compose -f b2b.yml logs -f              # import summary, confirmation bl
 
 ## 4. After a batch (manual inbox check)
 
-1. Read the sender inbox: bounces, replies, "no" / opt-out answers.
-2. Update the affected contacts (until a tool exists, ask Claude to prepare the update).
+1. Sync bounces and complaints from SES (also done automatically by every `send`):
+
+   ```bash
+   cd /opt/b2b && docker compose -f b2b.yml run --rm b2b-outreach sync-bounces   # add --dry-run to only count
+   ```
+
+2. Read the sender inbox for replies and "no" / opt-out answers, and ask Claude to prepare the
+   update for those contacts.
 3. Record the check, which releases the batch hold:
 
    ```bash

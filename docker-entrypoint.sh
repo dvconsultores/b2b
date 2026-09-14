@@ -10,6 +10,10 @@
 #   preview              import (as above), then write the next batch to data/previews (sends nothing)
 #   import               only import contactos/ into the database (creates it on first run)
 #   mark-inbox-checked   record the manual inbox check (releases the batch hold)
+#   sync-bounces [--dry-run]  mark SES-suppressed addresses bounced / opted out in the database
+#
+# send always runs with --ses-guard: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION
+# (read-only SES key) must be in .env.
 #   <anything else>      run it as a command
 #
 # The import is safe to repeat: it adds new valid contacts and refreshes descriptive fields,
@@ -61,7 +65,7 @@ case "${1:-send}" in
         fi
         maybe_import
         args=(--mode send --db "$DB" --env "$ENV_FILE" --confirm "$CONFIRM_CAMPAIGN"
-              --wait-for-window --notify)
+              --wait-for-window --notify --ses-guard)
         if [[ "${FORCE_NO_DMARC:-0}" == "1" ]]; then
             args+=(--force-no-dmarc)
         fi
@@ -77,6 +81,9 @@ case "${1:-send}" in
         ;;
     mark-inbox-checked)
         exec python -m b2b.mark_inbox_checked --db "$DB"
+        ;;
+    sync-bounces)
+        exec python -m b2b.sync_bounces --db "$DB" --env "$ENV_FILE" "${@:2}"
         ;;
     *)
         exec "$@"

@@ -18,7 +18,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
-from b2b import ConfigError, pacing, store, tracking
+from b2b import ConfigError, pacing, ses_api, store, tracking
+from b2b.bounces import apply_suppressions
 from b2b.campaign import Campaign, load_campaign
 from b2b.eligibility import select_recipients
 from b2b.mailer import SenderSettings, SendOutcome, check_login, load_sender_settings, send_email
@@ -37,7 +38,7 @@ EXIT_STOPPED = 4
 EXIT_INTERRUPTED = 130
 
 _WEEK = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-_SEND_ONLY_OPTIONS = ("force_no_dmarc", "confirm", "wait_for_window", "notify")
+_SEND_ONLY_OPTIONS = ("force_no_dmarc", "confirm", "wait_for_window", "notify", "ses_guard")
 
 
 class _ArgumentError(Exception):
@@ -58,6 +59,7 @@ class _Context:
     sleep: Callable[[float], None]
     ask: Callable[[str], str]
     rng: random.Random
+    ses_clients: object | None = None
 
 
 def _error(message: str) -> None:
@@ -86,6 +88,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="send mode: sleep until the send window opens instead of stopping")
     parser.add_argument("--notify", action="store_true",
                         help="send mode: email the counts-only summary to TEST_RECIPIENTS when the run ends")
+    parser.add_argument("--ses-guard", action="store_true",
+                        help="send mode: sync bounces from the SES API and pause on the real bounce rate")
     args = parser.parse_args(argv)
     if args.mode != "send":
         for name in _SEND_ONLY_OPTIONS:
@@ -100,7 +104,7 @@ def _raise_interrupt(signum, frame):
 
 
 def main(argv: list[str] | None = None, *, smtp_factory=None, resolver=None, now=None,
-         sleep=None, ask=None, rng=None) -> int:
+         sleep=None, ask=None, rng=None, ses_clients=None) -> int:
     try:
         args = _parse_args(argv)
     except _ArgumentError as exc:
@@ -114,6 +118,7 @@ def main(argv: list[str] | None = None, *, smtp_factory=None, resolver=None, now
         sleep=sleep or time_module.sleep,
         ask=ask or input,
         rng=rng or random.Random(),
+        ses_clients=ses_clients,
     )
     # docker stop / Watchtower send SIGTERM: treat it like Ctrl+C so the run is closed cleanly.
     previous_handler = None
@@ -336,6 +341,26 @@ def _notify(ctx: _Context, settings: SenderSettings, summary: SendSummary) -> No
             _error(f"summary email not sent ({outcome.error_kind or outcome.status})")
 
 
+class _SesGuard:
+    """Live bounce protection from the SES API (spec 003).
+
+    SES accepts every email at SMTP time and reports bounces later, so before each email the
+    contact database is refreshed from the suppression list and the real bounce rate is checked.
+    """
+
+    def __init__(self, clients, campaign: Campaign):
+        self.clients = clients
+        self.campaign = campaign
+
+    def sync(self, conn: sqlite3.Connection):
+        return apply_suppressions(conn, ses_api.list_suppressed(self.clients))
+
+    def rate_exceeded(self, since: datetime) -> bool:
+        stats = ses_api.send_statistics(self.clients, since)
+        return tracking.bounce_exceeded(stats.bounces, stats.attempts,
+                                        self.campaign.bounce_pause_threshold, self.campaign.bounce_min_sends)
+
+
 def _production_locked(ctx: _Context, db_path: Path) -> int:
     loaded = _load_or_report(ctx)
     if loaded is None:
@@ -353,6 +378,28 @@ def _production_locked(ctx: _Context, db_path: Path) -> int:
                    "python -m b2b.mark_inbox_checked before the next production batch")
             _print_summary(summary)
             return EXIT_REFUSED
+
+        guard = None
+        if ctx.args.ses_guard:
+            try:
+                clients = ctx.ses_clients
+                if clients is None:
+                    clients = ses_api.make_clients(ses_api.load_aws_settings(Path(ctx.args.env)))
+                guard = _SesGuard(clients, campaign)
+                synced = guard.sync(conn)
+                _log(f"SES bounce sync: {synced.newly_bounced} newly bounced, "
+                     f"{synced.newly_opted_out} newly opted out")
+                if guard.rate_exceeded(ctx.now() - timedelta(hours=24)):
+                    summary.stop_reason = "ses_bounce_rate"
+                    _error("SES bounce rate in the last 24 hours is above the pause threshold; sending stays paused")
+                    _print_summary(summary)
+                    return EXIT_REFUSED
+            except ConfigError as exc:
+                _error(str(exc))
+                return EXIT_CONFIG
+            except ses_api.SesApiError as exc:
+                _error(f"SES API check failed ({exc})")
+                return EXIT_CONFIG
 
         summary.bounced, summary.bounce_base = tracking.campaign_bounce(conn, campaign.name, campaign.step)
         if tracking.bounce_exceeded(summary.bounced, summary.bounce_base,
@@ -409,9 +456,10 @@ def _production_locked(ctx: _Context, db_path: Path) -> int:
             _print_summary(summary)
             return EXIT_REFUSED
 
-        run_id = tracking.start_run(conn, campaign.name, campaign.step, forced, _timestamp(ctx.now()))
+        run_started = ctx.now()
+        run_id = tracking.start_run(conn, campaign.name, campaign.step, forced, _timestamp(run_started))
         try:
-            stop_reason = _send_loop(ctx, conn, campaign, settings, batch, run_id, summary)
+            stop_reason = _send_loop(ctx, conn, campaign, settings, batch, run_id, summary, guard, run_started)
         except KeyboardInterrupt:
             summary.result = "stopped"
             if ctx.args.notify:
@@ -428,12 +476,20 @@ def _production_locked(ctx: _Context, db_path: Path) -> int:
         conn.close()
 
 
-def _pre_send_stop(ctx: _Context, conn: sqlite3.Connection, campaign: Campaign) -> str | None:
+def _pre_send_stop(ctx: _Context, conn: sqlite3.Connection, campaign: Campaign,
+                   guard: _SesGuard | None = None, run_started: datetime | None = None) -> str | None:
     """Return a stop reason, or None once the next email may be sent (sleeping as needed)."""
     while True:
         now = ctx.now()
         if pacing.launch_price_passed(campaign, now):
             return "launch_price_ended"
+        if guard is not None:
+            try:
+                guard.sync(conn)
+                if guard.rate_exceeded(run_started or now):
+                    return "ses_bounce_rate"
+            except ses_api.SesApiError:
+                return "ses_check_failed"
         bounced, base = tracking.campaign_bounce(conn, campaign.name, campaign.step)
         if tracking.bounce_exceeded(bounced, base, campaign.bounce_pause_threshold, campaign.bounce_min_sends):
             return "bounce_threshold"
@@ -452,14 +508,15 @@ def _pre_send_stop(ctx: _Context, conn: sqlite3.Connection, campaign: Campaign) 
 
 
 def _send_loop(ctx: _Context, conn: sqlite3.Connection, campaign: Campaign, settings: SenderSettings,
-               batch: list[RenderedEmail], run_id: int, summary: SendSummary) -> str:
+               batch: list[RenderedEmail], run_id: int, summary: SendSummary,
+               guard: _SesGuard | None = None, run_started: datetime | None = None) -> str:
     stop_reason = "batch_complete"
     consecutive_temporary = 0
     try:
         for index, email in enumerate(batch):
             if index > 0:
                 ctx.sleep(pacing.next_interval(campaign, ctx.rng))
-            stop = _pre_send_stop(ctx, conn, campaign)
+            stop = _pre_send_stop(ctx, conn, campaign, guard, run_started)
             if stop is not None:
                 stop_reason = stop
                 break
@@ -484,6 +541,11 @@ def _send_loop(ctx: _Context, conn: sqlite3.Connection, campaign: Campaign, sett
         raise
     finally:
         tracking.finish_run(conn, run_id, stop_reason, _timestamp(ctx.now()))
+        if guard is not None:
+            try:
+                guard.sync(conn)  # include bounces that arrived during the run in the summary
+            except ses_api.SesApiError:
+                pass
         summary.bounced, summary.bounce_base = tracking.campaign_bounce(conn, campaign.name, campaign.step)
         summary.stop_reason = stop_reason
     return stop_reason

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-14
+
+- ops: first production batch stopped by the operator after the SES API showed 65 attempts and
+  10 bounces (15.4%) on 2026-09-14; the SMTP-time pause rule could not see asynchronous bounces.
+- feat: spec 003 SES bounce guard (`specs/003-ses-bounce-guard`). New `b2b/ses_api.py` (read-only
+  SES key from `.env`), `b2b/bounces.py` and `python -m b2b.sync_bounces [--dry-run]` (suppression
+  list → bounced / opted out, counts only). `send_first_email --ses-guard` syncs before starting and
+  before every email, refuses above 2% over the last 24 h, stops with `ses_bounce_rate` or
+  `ses_check_failed`. Docker `send` always uses the guard; new `sync-bounces` command.
+  `boto3==1.43.93` pinned. `.env.example`, `docs/deployment.md`, spec 002 CLI contract and
+  `.claude/CLAUDE.md` (egress rule: `AWS_*` keys) updated.
+
 ## 2026-09-13
 
 - ops: container imports the contact spreadsheets on start (user request). The entrypoint's

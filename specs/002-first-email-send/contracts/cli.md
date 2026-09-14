@@ -19,12 +19,13 @@
 | `--confirm CAMPAIGN` | none | `send` only: confirm at launch instead of typing; must equal the campaign name (exit 3 otherwise) |
 | `--wait-for-window` | off | `send` only: sleep until the send window opens (at start and mid-batch) instead of stopping |
 | `--notify` | off | `send` only: email the counts-only summary to `TEST_RECIPIENTS` when the run ends |
+| `--ses-guard` | off | `send` only (spec 003): sync bounces from the SES API before starting and before every email; refuse / stop on the real SES bounce rate; needs the `AWS_*` keys |
 
-Send-only options (`--force-no-dmarc`, `--confirm`, `--wait-for-window`, `--notify`) with another
-mode → exit 1. The typed confirmation can only be replaced by `--confirm` with the exact campaign name.
+Send-only options (`--force-no-dmarc`, `--confirm`, `--wait-for-window`, `--notify`, `--ses-guard`) with
+another mode → exit 1. The typed confirmation can only be replaced by `--confirm` with the exact campaign name.
 
 Python entry point for tests:
-`b2b.send_first_email.main(argv, *, smtp_factory=None, resolver=None, now=None, sleep=None, ask=None, rng=None) -> int`.
+`b2b.send_first_email.main(argv, *, smtp_factory=None, resolver=None, now=None, sleep=None, ask=None, rng=None, ses_clients=None) -> int`.
 
 ## Confirmation (send mode)
 
@@ -52,7 +53,7 @@ Anything other than the exact campaign name → exit 3, nothing sent.
 | 1 | configuration or input error: config, template, `.env` key, launch-price date passed, SMTP login check failed, `--force-no-dmarc` outside send mode |
 | 2 | database error or schema newer than 2 |
 | 3 | refused by a gate before any email: another send run active, batch hold, bounce rate already above threshold, DMARC not present without force, confirmation not given |
-| 4 | production run stopped by a guard after starting: `launch_price_ended`, `bounce_threshold`, `window_closed`, `temporary_failures`, `connection_lost` or a stop-class error kind |
+| 4 | production run stopped by a guard after starting: `launch_price_ended`, `bounce_threshold`, `window_closed`, `temporary_failures`, `connection_lost`, `ses_bounce_rate`, `ses_check_failed` or a stop-class error kind |
 | 130 | interrupted (Ctrl+C); the in-flight attempt, if any, is resolved as `unknown` at the next production start |
 
 ## Standard output — summary
@@ -115,10 +116,11 @@ is missing or its schema is newer than supported.
 
 | Command | Runs |
 |---------|------|
-| `send` (default) | `send_first_email --mode send --db /app/data/b2b.sqlite3 --env "$ENV_FILE"` (default `/app/data/.env`; `b2b.yml` sets `/app/.env`) `--confirm "$CONFIRM_CAMPAIGN" --wait-for-window --notify` plus `--force-no-dmarc` when `FORCE_NO_DMARC=1`; exit 3 when `CONFIRM_CAMPAIGN` is empty |
+| `send` (default) | `send_first_email --mode send --db /app/data/b2b.sqlite3 --env "$ENV_FILE"` (default `/app/data/.env`; `b2b.yml` sets `/app/.env`) `--confirm "$CONFIRM_CAMPAIGN" --wait-for-window --notify --ses-guard` plus `--force-no-dmarc` when `FORCE_NO_DMARC=1`; exit 3 when `CONFIRM_CAMPAIGN` is empty |
 | `preview` | import on start (below), then preview mode, previews in `/app/data/previews` |
 | `import` | only `import_contacts --clients /app/contactos/$CLIENTS_FILE --yearbook /app/contactos/$YEARBOOK_FILE --db /app/data/b2b.sqlite3 --reports-dir /app/data/reports --config-dir /app/config` |
 | `mark-inbox-checked` | `mark_inbox_checked --db /app/data/b2b.sqlite3` |
+| `sync-bounces [--dry-run]` | `sync_bounces --db /app/data/b2b.sqlite3 --env "$ENV_FILE"` (spec 003) |
 | anything else | executed as given |
 
 Import on start: when `IMPORT_ON_START=1` (default), `send` and `preview` run the `import` step first.

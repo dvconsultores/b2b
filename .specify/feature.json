@@ -1,3 +1,3 @@
 {
-  "feature_directory": "specs/002-first-email-send"
+  "feature_directory": "specs/003-ses-bounce-guard"
 }
