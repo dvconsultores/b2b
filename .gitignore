@@ -1,0 +1,18 @@
+# Secrets and real contact data — never commit (public repository).
+.env
+.env.*
+contactos/
+data/
+*.sqlite3
+*.sqlite3-*
+*.send.lock
+*.bak-*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Spec Kit cache
+.specify/integrations/.cache/

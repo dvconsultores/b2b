@@ -1,0 +1,27 @@
+name = "primer-contacto-2026"
+step = 1
+template = "config/templates/primer_contacto.txt"
+launch_price_end = 2026-12-31
+timezone = "America/Caracas"
+hourly_cap = 20
+batch_limit = 100
+send_days = ["mon", "tue", "wed", "thu", "fri"]
+send_start = "08:00"
+send_end = "17:00"
+bounce_pause_threshold = 0.02
+bounce_min_sends = 20
+temporary_failure_limit = 3
+test_sample_count = 3
+
+[phrases]
+greeting_with_name = "Hola {nombre},"
+greeting_without_name = "Hola,"
+opening_with_city = "Vi que {empresa} está en {ciudad} y quería hacerle una pregunta rápida: ¿todavía calculan la nómina a mano o en hojas de cálculo?"
+opening_without_city = "Quería hacerle una pregunta rápida sobre la nómina de {empresa}: ¿todavía la calculan a mano o en hojas de cálculo?"
+company_fallback = "su empresa"
+opt_out = "P. D.: Si no es de su interés, responda \"no\" y no le vuelvo a escribir."
+
+[test_sample]
+nombre = "ANA PÉREZ"
+empresa = "EMPRESA EJEMPLO, C.A."
+ciudad = "Caracas"

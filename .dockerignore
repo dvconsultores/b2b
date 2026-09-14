@@ -1,0 +1,25 @@
+# Never ship secrets or contact data in the image.
+.env
+.env.*
+contactos/
+data/
+*.sqlite3
+*.sqlite3-*
+*.send.lock
+
+# Not needed at runtime.
+.git
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.claude/
+.specify/
+specs/
+docs/
+tests/
+scripts/
+deploy.sh
+push-db.sh
+docker-compose.yml
+requirements-dev.txt

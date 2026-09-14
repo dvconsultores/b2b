@@ -1,0 +1,12 @@
+Asunto: Pregunta rápida sobre la nómina de {empresa}
+
+{saludo}
+
+{apertura}
+
+Con Nómina Atenea las empresas dejan de perder horas cada quincena y evitan errores en los pagos. Además, mantenemos el precio de lanzamiento durante todo el año, con la mejor relación precio-calidad del mercado.
+
+¿Le interesa que le cuente cómo funciona? Con responder "sí" es suficiente.
+
+Saludos,
+{remitente}

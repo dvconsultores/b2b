@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["Bash", "Edit", "Read", "WebFetch", "WebSearch", "Agent", "mcp__deepseek__*"],
+    "deny": ["Bash(psql *DATABASE_URL_PROD*)"]
+  }
+}
