@@ -212,6 +212,12 @@ server, and automatic inbox processing (spec 003) is dropped for now.
   `docker-entrypoint.sh` (`send` → `--mode send --confirm "$CONFIRM_CAMPAIGN" --wait-for-window
   --notify [--force-no-dmarc]`; `preview`; `mark-inbox-checked`), `b2b.yml` compose file in `/opt/b2b` (database in `/opt/b2b/data`, `.env` mounted read-only)
   (`restart: "no"`, Watchtower disabled), `deploy.sh`, `push-db.sh`; runbook in `docs/deployment.md`.
+- **D24 — Import on start**: with `IMPORT_ON_START=1` (default) the entrypoint's `send` and `preview`
+  commands first run spec 001's `import_contacts` on `/app/contactos/$CLIENTS_FILE` and
+  `/app/contactos/$YEARBOOK_FILE` (read-only mount of `/opt/b2b/contactos`), creating the database and
+  tables on first start; a non-zero import exit stops the container before sending. Missing files with
+  an existing database → import skipped with a log line; missing files and no database → exit 1.
+  `import` runs the import alone. Spreadsheets reach the server with `push-contactos.sh`.
 
 ## Project Structure
 

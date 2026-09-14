@@ -21,5 +21,6 @@ tests/
 scripts/
 deploy.sh
 push-db.sh
+push-contactos.sh
 b2b.yml
 requirements-dev.txt

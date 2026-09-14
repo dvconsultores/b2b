@@ -30,7 +30,9 @@
   `.gitignore`, `.dockerignore`). Commits: `type: short description` (`feat:`,
   `fix:`, `docs:`, `ops:`); stage only the task's files; list every changed file
   in the report and add an entry to `docs/CHANGELOG.md`.
-- **Deployment:** `./deploy.sh` (tests, build, push image), `./push-db.sh` (upload
+- **Deployment:** the container imports `contactos/` into the database on every start
+  (`IMPORT_ON_START=1`), then sends one batch. `./push-contactos.sh` uploads the spreadsheets
+  to `/opt/b2b/contactos`; `.env.example` lists every key. `./deploy.sh` (tests, build, push image), `./push-db.sh` (upload
   the tracker DB to `/opt/b2b/data`), server compose file `b2b.yml`; see
   `docs/deployment.md`. Spec 003 (automatic inbox processing) was dropped for now:
   the operator checks the inbox by hand and runs `python -m b2b.mark_inbox_checked`.

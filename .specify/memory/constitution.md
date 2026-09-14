@@ -1,6 +1,10 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0 (2026-09-13, MINOR)
+- Version change: 1.1.0 → 1.2.0 (2026-09-13, MINOR)
+  - IV. Contact Data Stays Local: contact data may also be stored and processed on the
+    operator's own server (spreadsheets, database) for unattended runs.
+  - Templates: no template changes needed.
+- Previous: 1.0.0 → 1.1.0 (2026-09-13, MINOR)
   - V. Safe by Default: the campaign-name confirmation may be supplied at launch for unattended
     (Docker) runs; the confirmation details are then written to the run log.
   - Operational Constraints: public git repository (secrets and contact data never committed);
@@ -60,9 +64,10 @@ filtered as bulk marketing (docs/plan.md §2).
 
 ### IV. Contact Data Stays Local
 
-- `contactos/` and every file derived from it are real personal data. They are processed on
-  this machine and leave it only as an individual email to that recipient through the
-  configured email provider.
+- `contactos/` and every file derived from it are real personal data. They are processed only on
+  this machine and on the operator's own server (copied there over SSH, with restricted file
+  permissions), and otherwise leave them only as an individual email to that recipient through
+  the configured email provider.
 - Contact data MUST NOT be sent to AI providers or other third-party services unless a spec
   explicitly approves a named service and purpose.
 - Code, tests, fixtures, docs and specs contain only column headers, aggregate counts and
@@ -128,4 +133,4 @@ Rationale: a one-person outreach tool has to be understandable and checkable at 
   sections, PATCH for clarifications.
 - Compliance is checked in every plan's Constitution Check and in the audit of every task.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.2.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13

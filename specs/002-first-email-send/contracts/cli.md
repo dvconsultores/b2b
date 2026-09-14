@@ -116,6 +116,11 @@ is missing or its schema is newer than supported.
 | Command | Runs |
 |---------|------|
 | `send` (default) | `send_first_email --mode send --db /app/data/b2b.sqlite3 --env "$ENV_FILE"` (default `/app/data/.env`; `b2b.yml` sets `/app/.env`) `--confirm "$CONFIRM_CAMPAIGN" --wait-for-window --notify` plus `--force-no-dmarc` when `FORCE_NO_DMARC=1`; exit 3 when `CONFIRM_CAMPAIGN` is empty |
-| `preview` | preview mode, previews in `/app/data/previews` |
+| `preview` | import on start (below), then preview mode, previews in `/app/data/previews` |
+| `import` | only `import_contacts --clients /app/contactos/$CLIENTS_FILE --yearbook /app/contactos/$YEARBOOK_FILE --db /app/data/b2b.sqlite3 --reports-dir /app/data/reports --config-dir /app/config` |
 | `mark-inbox-checked` | `mark_inbox_checked --db /app/data/b2b.sqlite3` |
 | anything else | executed as given |
+
+Import on start: when `IMPORT_ON_START=1` (default), `send` and `preview` run the `import` step first.
+Both files present → import; a non-zero exit stops the container with that code and nothing is sent.
+Files missing but the database exists → import skipped (logged). Files and database missing → exit 1.

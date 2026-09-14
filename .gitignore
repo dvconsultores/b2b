@@ -1,6 +1,7 @@
 # Secrets and real contact data — never commit (public repository).
 .env
 .env.*
+!.env.example
 contactos/
 data/
 *.sqlite3

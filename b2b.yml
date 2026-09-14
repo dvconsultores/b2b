@@ -1,12 +1,13 @@
-# b2b outreach — server compose file. Lives in /opt/b2b next to .env and data/ (b2b.sqlite3).
+# b2b outreach — server compose file. Lives in /opt/b2b next to .env, contactos/ and data/.
 #
 #   cd /opt/b2b
 #   docker compose -f b2b.yml pull
-#   CONFIRM_CAMPAIGN=primer-contacto-2026 docker compose -f b2b.yml up -d    # starts ONE batch
+#   CONFIRM_CAMPAIGN=primer-contacto-2026 docker compose -f b2b.yml up -d    # import, then ONE batch
 #   docker compose -f b2b.yml logs -f
 #
-# Never put CONFIRM_CAMPAIGN in .env: give it on the command line for each launch.
-# See docs/deployment.md.
+# On start the container imports contactos/ into data/b2b.sqlite3 (creating the database and
+# tables the first time), then sends. Never put CONFIRM_CAMPAIGN in .env: give it on the command
+# line for each launch. See docs/deployment.md.
 services:
   b2b-outreach:
     image: ${DOCKER_USERNAME:-andresdom2004}/b2b-outreach:latest
@@ -20,10 +21,15 @@ services:
     environment:
       - CONFIRM_CAMPAIGN=${CONFIRM_CAMPAIGN:-}
       - FORCE_NO_DMARC=${FORCE_NO_DMARC:-0}
+      - IMPORT_ON_START=${IMPORT_ON_START:-1}
+      - CLIENTS_FILE=${CLIENTS_FILE:-ClientesFebrero2020.xls}
+      - YEARBOOK_FILE=${YEARBOOK_FILE:-Year Book 2009.xlsx}
       - ENV_FILE=/app/.env
       - TZ=America/Caracas
     volumes:
       # .env is read by the app itself (read-only); it is not passed as container environment.
       - ./.env:/app/.env:ro
       - ./data:/app/data
+      # Contact spreadsheets (real personal data) — uploaded with push-contactos.sh, never in the image.
+      - ./contactos:/app/contactos:ro
     stop_grace_period: 30s

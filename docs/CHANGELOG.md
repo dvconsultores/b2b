@@ -2,6 +2,16 @@
 
 ## 2026-09-13
 
+- ops: container imports the contact spreadsheets on start (user request). The entrypoint's
+  `send` and `preview` run `import_contacts` first when `IMPORT_ON_START=1` (creating the database
+  and tables on first start; a failed import stops the container), and a new `import` command runs
+  it alone. `b2b.yml` mounts `./contactos` read-only and passes `IMPORT_ON_START`, `CLIENTS_FILE`,
+  `YEARBOOK_FILE`. New `push-contactos.sh` uploads the spreadsheets to `/opt/b2b/contactos`
+  (dir 700, files 600). `.env` gained the missing server and import keys (server login values left
+  empty for the operator); `.env.example` documents every key (allowed by `.gitignore`).
+  Constitution 1.1.0 → 1.2.0 (principle IV: operator's own server). Spec 002 plan D24, CLI
+  contract, `docs/deployment.md`, `.claude/CLAUDE.md`, `.dockerignore` updated.
+
 - ops: server compose file renamed `docker-compose.yml` → `b2b.yml`, following the Mockba server
   layout: `/opt/b2b/{b2b.yml,.env,data/}`, `.env` mounted read-only at `/app/.env` (not passed as
   container environment), database in `/opt/b2b/data`. Kept `restart: "no"` and the Watchtower
