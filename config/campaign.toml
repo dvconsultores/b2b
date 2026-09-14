@@ -12,7 +12,9 @@ bounce_pause_threshold = 0.02
 bounce_min_sends = 20
 temporary_failure_limit = 3
 test_sample_count = 3
-allowed_verification = ["valid"]
+allowed_verification = ["valid", "unverified"]
+source_years = [2020]
+continuous = true
 
 [phrases]
 greeting_with_name = "Hola {nombre},"

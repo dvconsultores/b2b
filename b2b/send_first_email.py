@@ -37,6 +37,8 @@ EXIT_REFUSED = 3
 EXIT_STOPPED = 4
 EXIT_INTERRUPTED = 130
 
+SES_RECHECK_SECONDS = 1800  # waiting at launch for the SES 24-hour bounce rate to fall (spec 005)
+
 _WEEK = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 _SEND_ONLY_OPTIONS = ("force_no_dmarc", "confirm", "wait_for_window", "notify", "ses_guard")
 
@@ -180,8 +182,10 @@ def _open_database(db_path: Path) -> sqlite3.Connection | None:
 
 def _render_batch(campaign: Campaign, template: Template, settings: SenderSettings, conn: sqlite3.Connection,
                   summary: SendSummary) -> list[RenderedEmail]:
-    selection = select_recipients(conn, campaign.name, campaign.step, campaign.allowed_verification)
+    selection = select_recipients(conn, campaign.name, campaign.step, campaign.allowed_verification,
+                                  campaign.source_years)
     emails: list[RenderedEmail] = []
+    skipped_link = 0
     for recipient in selection.recipients:
         email = render(
             template,
@@ -194,14 +198,15 @@ def _render_batch(campaign: Campaign, template: Template, settings: SenderSettin
             sender_name=settings.from_name,
         )
         if rendered_has_link(email):
-            summary.skipped_rendered_link += 1
+            skipped_link += 1
             continue
         emails.append(email)
     batch = emails[: campaign.batch_limit]
     summary.eligible = selection.eligible
     summary.skipped_not_verified = selection.skipped_not_verified
     summary.skipped_same_company = selection.skipped_same_company
-    summary.selected = len(batch)
+    summary.skipped_rendered_link = skipped_link
+    summary.selected += len(batch)  # continuous runs add each batch
     return batch
 
 
@@ -390,11 +395,16 @@ def _production_locked(ctx: _Context, db_path: Path) -> int:
                 synced = guard.sync(conn)
                 _log(f"SES bounce sync: {synced.newly_bounced} newly bounced, "
                      f"{synced.newly_opted_out} newly opted out")
-                if guard.rate_exceeded(ctx.now() - timedelta(hours=24)):
-                    summary.stop_reason = "ses_bounce_rate"
-                    _error("SES bounce rate in the last 24 hours is above the pause threshold; sending stays paused")
-                    _print_summary(summary)
-                    return EXIT_REFUSED
+                while guard.rate_exceeded(ctx.now() - timedelta(hours=24)):
+                    if not ctx.args.wait_for_window:
+                        summary.stop_reason = "ses_bounce_rate"
+                        _error("SES bounce rate in the last 24 hours is above the pause threshold; sending stays paused")
+                        _print_summary(summary)
+                        return EXIT_REFUSED
+                    _log("SES bounce rate in the last 24 hours is above the pause threshold; "
+                         f"checking again in {SES_RECHECK_SECONDS // 60} minutes")
+                    ctx.sleep(SES_RECHECK_SECONDS)
+                    guard.sync(conn)
             except ConfigError as exc:
                 _error(str(exc))
                 return EXIT_CONFIG
@@ -458,21 +468,33 @@ def _production_locked(ctx: _Context, db_path: Path) -> int:
             return EXIT_REFUSED
 
         run_started = ctx.now()
-        run_id = tracking.start_run(conn, campaign.name, campaign.step, forced, _timestamp(run_started))
-        try:
-            stop_reason = _send_loop(ctx, conn, campaign, settings, batch, run_id, summary, guard, run_started)
-        except KeyboardInterrupt:
-            summary.result = "stopped"
-            if ctx.args.notify:
-                _notify(ctx, settings, summary)
-            raise
-        summary.result = "done" if stop_reason == "batch_complete" else "stopped"
-        if stop_reason != "batch_complete":
+        while True:
+            run_id = tracking.start_run(conn, campaign.name, campaign.step, forced, _timestamp(ctx.now()))
+            try:
+                stop_reason = _send_loop(ctx, conn, campaign, settings, batch, run_id, summary, guard, run_started)
+            except KeyboardInterrupt:
+                summary.result = "stopped"
+                if ctx.args.notify:
+                    _notify(ctx, settings, summary)
+                raise
+            if stop_reason != "batch_complete" or not campaign.continuous:
+                break
+            # Continuous campaign (spec 005): next batch in the same launch; every guard in
+            # _pre_send_stop still runs before each email, with the bounce rate measured since launch.
+            batch = _render_batch(campaign, template, settings, conn, summary)
+            if not batch:
+                stop_reason = summary.stop_reason = "all_sent"
+                break
+            _log(f"batch complete; continuing with the next batch of {len(batch)}")
+            ctx.sleep(pacing.next_interval(campaign, ctx.rng))
+        finished = stop_reason in ("batch_complete", "all_sent")
+        summary.result = "done" if finished else "stopped"
+        if not finished:
             _error(f"sending stopped ({stop_reason})")
         _print_summary(summary)
         if ctx.args.notify:
             _notify(ctx, settings, summary)
-        return EXIT_OK if stop_reason == "batch_complete" else EXIT_STOPPED
+        return EXIT_OK if finished else EXIT_STOPPED
     finally:
         conn.close()
 

@@ -62,7 +62,9 @@ def test_real_config_loads() -> None:
     campaign = load_campaign(REAL_CONFIG)
     assert isinstance(campaign, Campaign)
     assert campaign.name == "primer-contacto-2026-b"
-    assert campaign.allowed_verification == ("valid",)
+    assert campaign.allowed_verification == ("valid", "unverified")
+    assert campaign.source_years == (2020,)
+    assert campaign.continuous is True
     assert campaign.step == 1
     assert campaign.template == Path("config/templates/primer_contacto.txt")
     assert campaign.launch_price_end == date(2026, 12, 31)
@@ -86,6 +88,30 @@ def test_valid_synthetic_loads(tmp_path: Path) -> None:
     assert campaign.phrases.greeting_with_name == "Hola {nombre},"
     assert campaign.test_sample.ciudad == "Caracas"
     assert campaign.allowed_verification == ("valid",)
+    assert campaign.source_years == (2020, 2009)
+    assert campaign.continuous is False
+
+
+def test_source_years_and_continuous(tmp_path: Path) -> None:
+    text = VALID.replace("test_sample_count = 3\n", "test_sample_count = 3\nsource_years = [2020]\ncontinuous = true\n")
+    campaign = load(tmp_path, text)
+    assert (campaign.source_years, campaign.continuous) == ((2020,), True)
+
+
+@pytest.mark.parametrize("line, message", [
+    ("source_years = 2020", "'source_years' has the wrong type"),
+    ('source_years = ["2020"]', "'source_years' has the wrong type"),
+    ("source_years = []", "'source_years' is invalid"),
+    ("source_years = [2020, 2020]", "'source_years' is invalid"),
+    ("source_years = [2015]", "'source_years' is invalid"),
+    ('continuous = "yes"', "'continuous' has the wrong type"),
+    ("continuous = 1", "'continuous' has the wrong type"),
+])
+def test_bad_source_years_or_continuous(tmp_path: Path, line: str, message: str) -> None:
+    path = write(tmp_path, VALID.replace("test_sample_count = 3\n", f"test_sample_count = 3\n{line}\n"))
+    with pytest.raises(ConfigError) as excinfo:
+        load_campaign(path)
+    assert str(excinfo.value) == f"{path}: {message}"
 
 
 def test_allowed_verification_list(tmp_path: Path) -> None:
@@ -99,7 +125,7 @@ def test_allowed_verification_list(tmp_path: Path) -> None:
     ("[]", "is invalid"),
     ('["valid", "valid"]', "is invalid"),
     ('["invalid"]', "is invalid"),
-    ('["unverified"]', "is invalid"),
+    ('["bogus"]', "is invalid"),
 ])
 def test_bad_allowed_verification(tmp_path: Path, literal: str, problem: str) -> None:
     path = write(tmp_path, VALID.replace("test_sample_count = 3\n", f"test_sample_count = 3\nallowed_verification = {literal}\n"))

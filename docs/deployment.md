@@ -54,7 +54,27 @@ into the database (bounces → bounced, complaints → opted out) and checks the
 - The campaign's own 2% rule also sees the synced bounces, so a campaign that bounced badly stays
   paused until you decide what to do with the list.
 
-## Email verification (before every new campaign)
+## Current campaign: continuous, 2020 list only (spec 005)
+
+`primer-contacto-2026-b` sends only to 2020 contacts (verified or not; addresses marked invalid by a
+verification import stay out) and keeps going batch after batch in one launch:
+
+- 100 per batch, 20 per hour, Monday–Friday 08:00–17:00 Caracas; nights and weekends it waits.
+- Before every email it syncs bounces from SES. Bounce rate since launch above 2% (after 20 sends)
+  → it stops, emails you the summary, and the campaign stays paused.
+- If the last 24 hours already show more than 2% bounces at launch, it waits and checks again
+  every 30 minutes.
+- When every eligible 2020 contact was emailed it stops with `all_sent`.
+
+Launch (after `docker compose -f b2b.yml pull`):
+
+```bash
+cd /opt/b2b
+FORCE_NO_DMARC=1 CONFIRM_CAMPAIGN=primer-contacto-2026-b docker compose -f b2b.yml up -d
+docker compose -f b2b.yml logs -f
+```
+
+## Email verification (optional)
 
 The first campaign bounced at 18%: the domain check cannot tell whether a mailbox still exists.
 Campaigns now send only to addresses a verification service confirmed (`allowed_verification`

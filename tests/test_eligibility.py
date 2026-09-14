@@ -131,6 +131,19 @@ def test_only_allowed_verification_statuses_are_selected(contacts_db, db_path):
     assert _emails(wider) == ["valid@example.com", "catch@example.com"]
 
 
+def test_source_years_filter_and_unverified_opt_in(contacts_db, db_path):
+    contacts_db([
+        {"email": "new@example.com", "company_key": "n:a", "verification": "unverified"},
+        {"email": "old@example.com", "company_key": "n:b", "verification": "unverified",
+         "source_year": 2009, "source_file": "Year Book 2009.xlsx"},
+        {"email": "bad@example.com", "company_key": "n:c", "verification": "invalid",
+         "verified_at": "2026-09-15T00:00:00Z"},
+    ])
+    selection = select_recipients(_conn(db_path), CAMPAIGN, 1, ("valid", "unverified"), (2020,))
+    assert _emails(selection) == ["new@example.com"]
+    assert (selection.eligible, selection.skipped_not_verified) == (1, 1)
+
+
 def test_invalid_best_contact_falls_back_to_verified_colleague(contacts_db, db_path):
     contacts_db([
         {"email": "best@example.com", "company_key": "n:empresa", "contact_name": "Ana",

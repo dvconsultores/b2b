@@ -3,9 +3,10 @@
 # docker-entrypoint.sh — commands for the b2b outreach container.
 #
 #   send                 import contactos/ into the database (IMPORT_ON_START=1), then one
-#                        production batch: 20/hour inside the send window, waits
-#                        overnight/weekends, stops when the batch ends, emails the
-#                        counts-only summary to TEST_RECIPIENTS. Requires
+#                        production batch (or batch after batch when the campaign sets
+#                        continuous = true): 20/hour inside the send window, waits
+#                        overnight/weekends, stops when done or when bounces pass the
+#                        threshold, emails the counts-only summary to TEST_RECIPIENTS. Requires
 #                        CONFIRM_CAMPAIGN=<campaign name>; FORCE_NO_DMARC=1 optional.
 #   preview              import (as above), then write the next batch to data/previews (sends nothing)
 #   import               only import contactos/ into the database (creates it on first run)

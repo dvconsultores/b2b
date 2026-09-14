@@ -201,7 +201,9 @@ def campaign_files(tmp_path):
         shutil.copyfile(ROOT / "config" / "templates" / "primer_contacto.txt", template)
         text = (ROOT / "config" / "campaign.toml").read_text(encoding="utf-8")
         text = re.sub(r'(?m)^template = .*$', f'template = "{template.as_posix()}"', text)
-        for key, literal in overrides.items():
+        # Operational choices of the real campaign (spec 004/005) are neutral in tests unless overridden.
+        neutral = {"allowed_verification": '["valid"]', "source_years": "[2020, 2009]", "continuous": "false"}
+        for key, literal in {**neutral, **overrides}.items():
             pattern = rf"(?m)^{re.escape(key)} = .*$"
             assert re.search(pattern, text), f"no top-level key {key} in campaign.toml"
             text = re.sub(pattern, f"{key} = {literal}", text)

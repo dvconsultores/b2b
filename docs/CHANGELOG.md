@@ -2,6 +2,16 @@
 
 ## 2026-09-14
 
+- feat: spec 005 continuous sending to the 2020 list (`specs/005-continuous-2020`), user request
+  after declining a paid verification service. Constitution 1.3.0 → 1.4.0 (consecutive batches only
+  under the bounce guard). Campaign keys `source_years` and `continuous`; `allowed_verification`
+  may include `unverified`. `primer-contacto-2026-b`: 2020 only, unverified allowed, continuous.
+  A continuous launch sends batch after batch (one `runs` row each) until `all_sent` or a guard
+  stops it; SES bounce rate measured since launch; with `--wait-for-window` the launch waits for
+  the 24-hour SES bounce rate to fall (30-minute checks). Tests use neutral campaign defaults;
+  new `tests/test_continuous.py`. Docs: CLI contract, `docs/deployment.md`, entrypoint and
+  `b2b.yml` comments, `.claude/CLAUDE.md`.
+
 - feat: spec 004 email verification (`specs/004-email-verification`), chosen by the user after the
   first batch ended at 61 accepted / 11 bounced (18%, run interrupted). Constitution 1.2.0 → 1.3.0
   (IV: email addresses only may go to NeverBounce or ZeroBounce). Schema v3

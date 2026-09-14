@@ -19,7 +19,7 @@
 | `--confirm CAMPAIGN` | none | `send` only: confirm at launch instead of typing; must equal the campaign name (exit 3 otherwise) |
 | `--wait-for-window` | off | `send` only: sleep until the send window opens (at start and mid-batch) instead of stopping |
 | `--notify` | off | `send` only: email the counts-only summary to `TEST_RECIPIENTS` when the run ends |
-| `--ses-guard` | off | `send` only (spec 003): sync bounces from the SES API before starting and before every email; refuse / stop on the real SES bounce rate; needs the `AWS_*` keys |
+| `--ses-guard` | off | `send` only (spec 003): sync bounces from the SES API before starting and before every email; refuse / stop on the real SES bounce rate; needs the `AWS_*` keys. With `--wait-for-window`, a 24-hour rate above the threshold at launch is re-checked every 30 minutes instead of refused (spec 005) |
 
 Send-only options (`--force-no-dmarc`, `--confirm`, `--wait-for-window`, `--notify`, `--ses-guard`) with
 another mode → exit 1. The typed confirmation can only be replaced by `--confirm` with the exact campaign name.
@@ -49,7 +49,7 @@ Anything other than the exact campaign name → exit 3, nothing sent.
 
 | Code | Meaning |
 |------|---------|
-| 0 | finished: preview written, test emails sent, batch complete, nothing eligible, or started outside the send window |
+| 0 | finished: preview written, test emails sent, batch complete, all eligible contacts sent (`all_sent`, continuous campaign, spec 005), nothing eligible, or started outside the send window |
 | 1 | configuration or input error: config, template, `.env` key, launch-price date passed, SMTP login check failed, `--force-no-dmarc` outside send mode |
 | 2 | database error or schema newer than 2 |
 | 3 | refused by a gate before any email: another send run active, batch hold, bounce rate already above threshold, DMARC not present without force, confirmation not given |

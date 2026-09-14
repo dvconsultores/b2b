@@ -36,6 +36,8 @@ _TOP_KEYS = (
     "temporary_failure_limit",
     "test_sample_count",
     "allowed_verification",
+    "source_years",
+    "continuous",
     "phrases",
     "test_sample",
 )
@@ -63,10 +65,14 @@ _DEFAULTS = {
     "temporary_failure_limit": 3,
     "test_sample_count": 3,
     "allowed_verification": ["valid"],
+    "source_years": [2020, 2009],
+    "continuous": False,
 }
 
-# Verification results a campaign may send to; "invalid" and "unverified" never qualify.
-_SENDABLE_VERIFICATION = ("valid", "catch_all", "unknown")
+# Verification results a campaign may send to; "invalid" never qualifies. "unverified" must be
+# listed explicitly (spec 005: send to the domain-checked list without a verification service).
+_SENDABLE_VERIFICATION = ("valid", "catch_all", "unknown", "unverified")
+_SOURCE_YEARS = (2020, 2009)
 
 _PHRASE_FIELDS = {
     "greeting_with_name": {"nombre"},
@@ -118,6 +124,8 @@ class Campaign:
     phrases: Phrases
     test_sample: TestSample
     allowed_verification: tuple[str, ...] = ("valid",)
+    source_years: tuple[int, ...] = (2020, 2009)
+    continuous: bool = False
 
 
 def _is_int(value: object) -> bool:
@@ -296,6 +304,20 @@ def load_campaign(path: Path) -> Campaign:
     ):
         raise ConfigError(f"{path}: 'allowed_verification' is invalid")
 
+    source_years = data.get("source_years", _DEFAULTS["source_years"])
+    if not isinstance(source_years, list) or not all(_is_int(year) for year in source_years):
+        raise ConfigError(f"{path}: 'source_years' has the wrong type")
+    if (
+        not source_years
+        or len(set(source_years)) != len(source_years)
+        or any(year not in _SOURCE_YEARS for year in source_years)
+    ):
+        raise ConfigError(f"{path}: 'source_years' is invalid")
+
+    continuous = data.get("continuous", _DEFAULTS["continuous"])
+    if not isinstance(continuous, bool):
+        raise ConfigError(f"{path}: 'continuous' has the wrong type")
+
     phrases_table = data["phrases"]
     phrase_values: dict[str, str] = {}
     for key in _PHRASES_KEYS:
@@ -330,4 +352,6 @@ def load_campaign(path: Path) -> Campaign:
         phrases=phrases,
         test_sample=test_sample,
         allowed_verification=tuple(allowed_verification),
+        source_years=tuple(source_years),
+        continuous=continuous,
     )

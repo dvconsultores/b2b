@@ -55,8 +55,11 @@ ORDER BY c.id
 
 
 def select_recipients(conn: sqlite3.Connection, campaign: str, step: int,
-                      allowed_verification: Sequence[str] = ("valid",)) -> Selection:
-    rows = conn.execute(_CANDIDATES, {"campaign": campaign, "step": step}).fetchall()
+                      allowed_verification: Sequence[str] = ("valid",),
+                      source_years: Sequence[int] = (2020, 2009)) -> Selection:
+    years = set(source_years)
+    rows = [row for row in conn.execute(_CANDIDATES, {"campaign": campaign, "step": step})
+            if row["source_year"] in years]
     allowed = set(allowed_verification)
     verified = [row for row in rows if row["verification"] in allowed]
 

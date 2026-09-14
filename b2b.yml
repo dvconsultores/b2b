@@ -2,7 +2,7 @@
 #
 #   cd /opt/b2b
 #   docker compose -f b2b.yml pull
-#   CONFIRM_CAMPAIGN=primer-contacto-2026-b docker compose -f b2b.yml up -d    # import, then ONE batch
+#   CONFIRM_CAMPAIGN=primer-contacto-2026-b docker compose -f b2b.yml up -d    # import, then batches until done or bounces stop it
 #   docker compose -f b2b.yml logs -f
 #
 # On start the container imports contactos/ into data/b2b.sqlite3 (creating the database and

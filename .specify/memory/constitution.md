@@ -1,6 +1,12 @@
 <!--
 Sync Impact Report
-- Version change: 1.2.0 → 1.3.0 (2026-09-14, MINOR)
+- Version change: 1.3.0 → 1.4.0 (2026-09-14, MINOR)
+  - I. Sender Reputation First: a campaign may continue batch after batch in one launch while
+    the bounce rate, checked before every email, stays under the pause threshold.
+  - Operational Constraints: unattended runs send one batch per launch, or consecutive batches
+    when the campaign sets `continuous = true` (spec 005). Requested by the user.
+  - Templates: no template changes needed.
+- Previous: 1.2.0 → 1.3.0 (2026-09-14, MINOR)
   - IV. Contact Data Stays Local: email addresses alone (no other field) may be uploaded by the
     operator to the email verification service approved in spec 004 (NeverBounce or ZeroBounce)
     to check that mailboxes exist before sending. Requested by the user after the first batch
@@ -40,7 +46,9 @@ Sync Impact Report
 - No address receives a production email unless it passed the list-quality checks of an
   implemented spec.
 - Sending MUST be throttled by a configured per-hour cap. The whole list is never sent at
-  once; each campaign starts with a small batch (on the order of 100 addresses).
+  once; each campaign starts with a small batch (on the order of 100 addresses). A campaign
+  may continue batch after batch in one launch only while its bounce rate, checked before
+  every email, stays under the pause threshold.
 - Bounce rate MUST be measured per campaign, and sending MUST pause automatically when it
   exceeds the pause threshold (default 2%). Resuming requires a human decision.
 
@@ -119,8 +127,9 @@ Rationale: a one-person outreach tool has to be understandable and checkable at 
 - Runtime: Python 3.13 in `.venv/`.
 - Version control: public GitHub repository; `.env`, `contactos/` and `data/` are never
   committed or built into images. Every change also gets an entry in `docs/CHANGELOG.md`.
-- Unattended production runs use the Docker image: one batch per launch, then the container
-  stops and emails a counts-only summary to the operator.
+- Unattended production runs use the Docker image: one batch per launch (or consecutive batches
+  when the campaign sets `continuous = true`, until the list is exhausted or a guard stops the
+  run), then the container stops and emails a counts-only summary to the operator.
 
 ## Development Workflow
 
@@ -143,4 +152,4 @@ Rationale: a one-person outreach tool has to be understandable and checkable at 
   sections, PATCH for clarifications.
 - Compliance is checked in every plan's Constitution Check and in the audit of every task.
 
-**Version**: 1.3.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-14
+**Version**: 1.4.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-14
