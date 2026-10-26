@@ -198,3 +198,63 @@ def test_check_login(send_env, fake_smtp):
 
 def test_stop_kinds():
     assert "connection_lost" in STOP_KINDS and "recipient_deferred" not in STOP_KINDS
+
+
+# --- spec 006: Gmail sender ---------------------------------------------------------------------
+
+
+def test_load_gmail_settings(artemisa_env):
+    from b2b.mailer import load_gmail_settings
+
+    s = load_gmail_settings(artemisa_env(), require_test_recipients=True)
+    assert (s.host, s.port, s.user, s.sender, s.from_name) == (
+        "smtp.gmail.com", 465, "artemisa-prueba@example.com", "artemisa-prueba@example.com", "Artemisa P2P")
+    assert s.password == "clave-app-prueba" and "clave-app-prueba" not in repr(s)
+    assert s.test_recipients == ("prueba1@example.org", "prueba2@example.net")
+    assert load_gmail_settings(artemisa_env(TEST_RECIPIENTS=None), require_test_recipients=False).test_recipients == ()
+
+
+def test_load_artemisa_ses_settings(send_env):
+    from b2b.mailer import load_artemisa_ses_settings
+
+    s = load_artemisa_ses_settings(send_env(), require_test_recipients=False)
+    assert (s.host, s.port, s.user, s.sender, s.from_name) == (
+        "smtp.example.com", 465, "usuario-prueba", "remitente@example.com", "Ana Remitente")
+    s = load_artemisa_ses_settings(send_env(ARTEMISA_GMAIL_FROM_NAME="Artemisa P2P"), require_test_recipients=True)
+    assert (s.sender, s.from_name, s.test_recipients) == (
+        "remitente@example.com", "Artemisa P2P", ("prueba1@example.org", "prueba2@example.net"))
+    path = send_env(ARTEMISA_GMAIL_FROM_NAME="Artemisa www.ejemplo")
+    with pytest.raises(ConfigError, match="invalid ARTEMISA_GMAIL_FROM_NAME"):
+        load_artemisa_ses_settings(path, require_test_recipients=False)
+    path = send_env(HOST_EMAIL=None)
+    with pytest.raises(ConfigError, match="missing HOST_EMAIL"):
+        load_artemisa_ses_settings(path, require_test_recipients=False)
+
+
+@pytest.mark.parametrize("overrides, message", [
+    ({"ARTEMISA_GMAIL_USER": None}, "missing ARTEMISA_GMAIL_USER"),
+    ({"ARTEMISA_GMAIL_USER": "no-es-correo"}, "invalid ARTEMISA_GMAIL_USER"),
+    ({"ARTEMISA_GMAIL_PASS": ""}, "missing ARTEMISA_GMAIL_PASS"),
+    ({"ARTEMISA_GMAIL_FROM_NAME": "Artemisa www.ejemplo"}, "invalid ARTEMISA_GMAIL_FROM_NAME"),
+    ({"TEST_RECIPIENTS": "mal"}, "invalid TEST_RECIPIENTS"),
+])
+def test_gmail_settings_errors(artemisa_env, overrides, message):
+    from b2b.mailer import load_gmail_settings
+
+    path = artemisa_env(**overrides)
+    with pytest.raises(ConfigError) as excinfo:
+        load_gmail_settings(path, require_test_recipients=True)
+    assert str(excinfo.value) == f"{path}: {message}"
+
+
+@pytest.mark.parametrize("refused, status, kind", [
+    ({"ana.perez@example.org": (550, b"5.1.1 no such user")}, "permanent_rejection", "recipient_refused"),
+    ({"ana.perez@example.org": (550, b"5.4.5 Daily user sending limit exceeded")}, "temporary_failure", "provider_throttled"),
+    ({"ana.perez@example.org": (450, b"4.2.1 try later")}, "temporary_failure", "recipient_deferred"),
+])
+def test_recipient_refusals(fake_smtp, send_env, refused, status, kind):
+    s = settings(send_env)
+    for script in ([smtplib.SMTPRecipientsRefused(refused)], [refused]):
+        factory, _log = fake_smtp(script)
+        outcome = send_email(s, EMAIL, NOW, factory)
+        assert (outcome.status, outcome.error_kind, outcome.smtp_code) == (status, kind, 550 if "5." in str(refused) else 450)

@@ -254,3 +254,69 @@ def contacts_db(db_path):
             conn.close()
 
     return make
+
+
+# --- spec 006 fixtures (Artemisa campaign) -----------------------------------------------------
+
+ARTEMISA_ENV_DEFAULTS = {
+    "ARTEMISA_GMAIL_USER": "artemisa-prueba@example.com",
+    "ARTEMISA_GMAIL_PASS": "clave-app-prueba",
+    "ARTEMISA_GMAIL_FROM_NAME": "Artemisa P2P",
+    "TEST_RECIPIENTS": "prueba1@example.org,prueba2@example.net",
+}
+
+
+@pytest.fixture
+def artemisa_env(tmp_path):
+    def make(**overrides) -> Path:
+        values = dict(ARTEMISA_ENV_DEFAULTS)
+        for key, value in overrides.items():
+            if value is None:
+                values.pop(key, None)
+            else:
+                values[key] = value
+        path = tmp_path / ".env"
+        path.write_text("".join(f"{key}={value}\n" for key, value in values.items()), encoding="utf-8")
+        return path
+
+    return make
+
+
+def synthetic_png(width: int = 2, height: int = 2) -> bytes:
+    """A valid tiny PNG built from the standard library (no image library in tests)."""
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    raw = b"".join(b"\x00" + b"\x10\x30\xff" * width for _ in range(height))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+
+@pytest.fixture
+def artemisa_files(tmp_path):
+    def make(**overrides) -> Path:
+        config_dir = tmp_path / "config"
+        (config_dir / "templates").mkdir(parents=True, exist_ok=True)
+        template = config_dir / "templates" / "artemisa.txt"
+        shutil.copyfile(ROOT / "config" / "templates" / "artemisa.txt", template)
+        images = []
+        for name in ("27.png", "43.png"):
+            path = tmp_path / "images" / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(synthetic_png())
+            images.append(path.as_posix())
+        text = (ROOT / "config" / "artemisa.toml").read_text(encoding="utf-8")
+        text = re.sub(r'(?m)^template = .*$', f'template = "{template.as_posix()}"', text)
+        text = re.sub(r'(?m)^images = .*$', "images = [" + ", ".join(f'"{i}"' for i in images) + "]", text)
+        for key, literal in overrides.items():
+            pattern = rf"(?m)^{re.escape(key)} = .*$"
+            assert re.search(pattern, text), f"no top-level key {key} in artemisa.toml"
+            text = re.sub(pattern, f"{key} = {literal}", text)
+        path = config_dir / "artemisa.toml"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    return make

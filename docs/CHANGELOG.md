@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-10-25
+
+- feat: spec 006 Artemisa P2P founders campaign (`specs/006-artemisa-campaign`), user request.
+  Constitution 1.4.0 → 1.5.0 (principles I/III and the SES constraint scoped to the nómina campaigns;
+  Artemisa may send HTML + inline images + Telegram handle from its Gmail account; phone numbers
+  only may go to Telegram's contact import). New `config/artemisa.toml`,
+  `config/templates/artemisa.txt` (user's text, typos corrected, opt-out line),
+  `b2b/artemisa_csv.py` (user id, email, first name, nickname, types only), `b2b/artemisa_config.py`, `b2b/artemisa_store.py` (own tracker
+  `data/artemisa.sqlite3` reusing the spec 002 `runs`/`send_attempts` tables and `b2b.tracking`),
+  `b2b/send_artemisa.py` (`--mode import|preview|test|send`, Gmail `smtp.gmail.com:465`, multipart
+  text + HTML with `cid:` inline PNGs, hourly cap + rolling 24-hour `daily_cap`, confirmation gate,
+  pending recovery, rejection-rate pause; a Gmail sending-limit 550 at recipient stage counts as
+  throttling, never as a bounce). `b2b/mailer.py`: `load_gmail_settings`, `send_message` (prebuilt
+  messages), `load_artemisa_ses_settings` for `--sender ses` (SES keys, Artemisa display name).
+  `.env` keys `ARTEMISA_GMAIL_USER/PASS/FROM_NAME`. Tests: `tests/test_artemisa_csv.py`,
+  `test_artemisa_config.py`, `test_artemisa_store.py`, `test_send_artemisa.py`, conftest fixtures
+  `artemisa_env`, `artemisa_files`; full suite 513 passed. Real import: 340 contacts, 0 rejected;
+  preview written. A Telegram phone-reachability check (Telethon user session) was built and then
+  removed the same day at the user's request ("forget the phone"); phones are not stored.
+  Docs: `docs/deployment.md`, `.env.example`, `.claude/CLAUDE.md`.
+- ops: the DeepSeek MCP entry (`~/.claude.json`) and the `.venv` interpreter symlinks were missing on
+  this machine (project moved); the symlinks were recreated. The three helper modules classified
+  DEEPSEEK in spec 006 (`artemisa_csv`, `artemisa_config`) were written by Claude because
+  the executor could not reach DeepSeek — flagged for the owner.
+
 ## 2026-09-14
 
 - feat: spec 005 continuous sending to the 2020 list (`specs/005-continuous-2020`), user request

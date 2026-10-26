@@ -1,6 +1,13 @@
 <!--
 Sync Impact Report
-- Version change: 1.3.0 → 1.4.0 (2026-09-14, MINOR)
+- Version change: 1.4.0 → 1.5.0 (2026-10-25, MINOR)
+  - Scope: principles I and III and the SES/source-data constraints now name the B2B nómina
+    campaigns (specs 001–005). The Artemisa P2P founders campaign (spec 006) emails the
+    platform's own registered users from its Gmail account: HTML with a plain-text alternative,
+    two inline images and the platform's Telegram handle are allowed for that campaign only;
+    hourly and rolling 24-hour caps replace the SES bounce guard. Requested by the user.
+  - Templates: no template changes needed.
+- Previous: 1.3.0 → 1.4.0 (2026-09-14, MINOR)
   - I. Sender Reputation First: a campaign may continue batch after batch in one launch while
     the bounce rate, checked before every email, stays under the pause threshold.
   - Operational Constraints: unattended runs send one batch per launch, or consecutive batches
@@ -46,9 +53,12 @@ Sync Impact Report
 - No address receives a production email unless it passed the list-quality checks of an
   implemented spec.
 - Sending MUST be throttled by a configured per-hour cap. The whole list is never sent at
-  once; each campaign starts with a small batch (on the order of 100 addresses). A campaign
+  once; each B2B campaign starts with a small batch (on the order of 100 addresses). A campaign
   may continue batch after batch in one launch only while its bounce rate, checked before
   every email, stays under the pause threshold.
+- The Artemisa campaign (spec 006) sends from the platform's own Gmail account to its
+  registered users under a per-hour cap and a rolling 24-hour cap below Gmail's daily limit;
+  a permanent-rejection rate above the pause threshold pauses it.
 - Bounce rate MUST be measured per campaign, and sending MUST pause automatically when it
   exceeds the pause threshold (default 2%). Resuming requires a human decision.
 
@@ -68,9 +78,13 @@ faster than bounces.
 
 ### III. Plain, Human First Contact
 
-- The first email MUST be plain text: no HTML, images, links, tracking pixels or attachments.
-- Attachments are never sent at any step.
+- The first B2B email (nómina outreach, specs 001–005) MUST be plain text: no HTML, images,
+  links, tracking pixels or attachments.
+- Attachments are never sent at any step of the B2B campaigns.
 - A link to the landing page is sent only after the prospect replies.
+- Exception (spec 006): an announcement to Artemisa P2P's own registered users may be HTML with
+  a plain-text alternative, the platform's inline images and its Telegram handle; never tracking
+  pixels or resources loaded from the network. It carries an opt-out line.
 - Every email MUST identify the real sender and MUST NOT use misleading subject lines.
 
 Rationale: plain personal messages reach the inbox and get replies; designed emails are
@@ -123,7 +137,11 @@ Rationale: a one-person outreach tool has to be understandable and checkable at 
 
 - Email provider: Amazon SES through its SMTP interface; connection settings in `.env`
   (`HOST_EMAIL`, `PORT_EMAIL`, `USER_EMAIL`, `PASS_EMAIL`, `SENDER_EMAIL`, `SMTP_FROM_NAME`).
-- Source data: `contactos/ClientesFebrero2020.xls` and `contactos/Year Book 2009.xlsx`.
+  The Artemisa campaign (spec 006) uses the platform's Gmail account (`ARTEMISA_GMAIL_USER`,
+  `ARTEMISA_GMAIL_PASS`, `ARTEMISA_GMAIL_FROM_NAME`) and runs from the operator's machine.
+- Source data: `contactos/ClientesFebrero2020.xls` and `contactos/Year Book 2009.xlsx` (B2B);
+  `contactos/artemisa.csv`, `contactos/27.png`, `contactos/43.png` (Artemisa, tracker
+  `data/artemisa.sqlite3`).
 - Runtime: Python 3.13 in `.venv/`.
 - Version control: public GitHub repository; `.env`, `contactos/` and `data/` are never
   committed or built into images. Every change also gets an entry in `docs/CHANGELOG.md`.
@@ -152,4 +170,4 @@ Rationale: a one-person outreach tool has to be understandable and checkable at 
   sections, PATCH for clarifications.
 - Compliance is checked in every plan's Constitution Check and in the audit of every task.
 
-**Version**: 1.4.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-14
+**Version**: 1.5.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-10-25

@@ -41,7 +41,14 @@
   (`specs/004-email-verification`, schema v3) exports email addresses only for NeverBounce /
   ZeroBounce and imports the results; campaigns send only to `allowed_verification`. Spec 005
   (`specs/005-continuous-2020`) adds `source_years` and `continuous` campaign keys: the current
-  campaign sends to 2020 contacts batch after batch until a bounce guard stops it.
+  campaign sends to 2020 contacts batch after batch until a bounce guard stops it. Spec 006
+  (`specs/006-artemisa-campaign`) is a separate product campaign: `contactos/artemisa.csv` (Artemisa
+  P2P users, **real personal data**) + `contactos/27.png`, `43.png` → tracker `data/artemisa.sqlite3`
+  (own schema, reuses `runs`/`send_attempts`), `config/artemisa.toml`, `config/templates/artemisa.txt`,
+  `.venv/bin/python -m b2b.send_artemisa --mode import|preview|test|send` from a Gmail account
+  (`.env` `ARTEMISA_GMAIL_*`, HTML + inline images allowed for this campaign only, hourly and
+  rolling 24-hour caps; `--sender ses` uses the SES keys). On the server: compose service
+  `b2b-artemisa` (profile `artemisa`, entrypoint `send-artemisa`), `DBNAME=artemisa.sqlite3 ./push-db.sh`.
 
 ## Role Assignment (Non-Negotiable)
 
@@ -151,8 +158,9 @@ If unsure whether a task qualifies, **ask the user** before delegating or implem
 DeepSeek is an external provider. Never send it any `.env*` file, `*.log`, or
 values of `HOST_EMAIL`, `PORT_EMAIL`, `USER_EMAIL`, `PASS_EMAIL`, `SENDER_EMAIL`,
 `SMTP_FROM_NAME`, `TEST_RECIPIENTS`, `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `SRVUSER`,
-`SRVPASS`, `SRVHOST`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. Never send real contact data: rows or cells from
-`contactos/*.xls` / `*.xlsx` or any CSV/JSON exported from them, anything under
+`SRVPASS`, `SRVHOST`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `ARTEMISA_GMAIL_USER`,
+`ARTEMISA_GMAIL_PASS`, `ARTEMISA_GMAIL_FROM_NAME`. Never send real contact data: rows or cells from
+`contactos/*.xls` / `*.xlsx` / `*.csv` or any CSV/JSON exported from them, anything under
 `data/` (the contact database and its reports), send/bounce reports, or real names, emails, phone numbers, addresses or company names of
 clients. Column headers and synthetic sample rows are allowed. The executor
 enforces this; Claude must not override it.

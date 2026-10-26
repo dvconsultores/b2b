@@ -1,0 +1,23 @@
+# Artemisa P2P founders campaign (spec 006). Sent from the Artemisa Gmail account
+# (ARTEMISA_GMAIL_* in .env) by python -m b2b.send_artemisa; tracker data/artemisa.sqlite3.
+name = "artemisa-fundadores-2026"
+template = "config/templates/artemisa.txt"
+images = ["contactos/27.png", "contactos/43.png"]
+timezone = "America/Caracas"
+# Gmail personal accounts: 500 messages per rolling 24 hours; keep headroom and spread the sends.
+hourly_cap = 30
+daily_cap = 400
+send_days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+send_start = "09:00"
+send_end = "21:00"
+bounce_pause_threshold = 0.05
+bounce_min_sends = 20
+temporary_failure_limit = 3
+
+[phrases]
+greeting_with_name = "Hola {nombre},"
+greeting_without_name = "Hola,"
+opt_out = "Si no quieres recibir más correos de Artemisa P2P, responde \"no\" y no te volvemos a escribir."
+
+[test_sample]
+nombre = "ANA"

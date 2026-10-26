@@ -5,6 +5,12 @@
 #   CONFIRM_CAMPAIGN=primer-contacto-2026-b docker compose -f b2b.yml up -d    # import, then batches until done or bounces stop it
 #   docker compose -f b2b.yml logs -f
 #
+# Artemisa P2P campaign (spec 006, profile "artemisa", never started by a plain `up`):
+#   CONFIRM_CAMPAIGN=artemisa-fundadores-2026 docker compose -f b2b.yml --profile artemisa up -d b2b-artemisa
+#   docker compose -f b2b.yml logs -f b2b-artemisa
+# Needs ARTEMISA_GMAIL_USER / ARTEMISA_GMAIL_PASS / ARTEMISA_GMAIL_FROM_NAME in .env (or
+# ARTEMISA_SENDER=ses to use the SES keys), and contactos/artemisa.csv + 27.png + 43.png.
+#
 # On start the container imports contactos/ into data/b2b.sqlite3 (creating the database and
 # tables the first time), then sends. Never put CONFIRM_CAMPAIGN in .env: give it on the command
 # line for each launch. See docs/deployment.md.
@@ -31,5 +37,25 @@ services:
       - ./.env:/app/.env:ro
       - ./data:/app/data
       # Contact spreadsheets (real personal data) — uploaded with push-contactos.sh, never in the image.
+      - ./contactos:/app/contactos:ro
+    stop_grace_period: 30s
+
+  b2b-artemisa:
+    image: ${DOCKER_USERNAME:-andresdom2004}/b2b-outreach:latest
+    container_name: b2b-artemisa
+    profiles: ["artemisa"]
+    command: send-artemisa
+    restart: "no"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    environment:
+      - CONFIRM_CAMPAIGN=${CONFIRM_CAMPAIGN:-}
+      - ARTEMISA_SENDER=${ARTEMISA_SENDER:-gmail}
+      - ARTEMISA_FILE=${ARTEMISA_FILE:-artemisa.csv}
+      - ENV_FILE=/app/.env
+      - TZ=America/Caracas
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./data:/app/data
       - ./contactos:/app/contactos:ro
     stop_grace_period: 30s

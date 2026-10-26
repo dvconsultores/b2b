@@ -1,7 +1,9 @@
 """Sender settings from .env, message building and SMTP outcome classification
-(spec 002 plan D12, D13). Never stores or prints SMTP response text or credentials."""
+(spec 002 plan D12, D13; Gmail sender and prebuilt messages, spec 006 plan D6).
+Never stores or prints SMTP response text or credentials."""
 from __future__ import annotations
 
+import dataclasses
 import smtplib
 import ssl
 from dataclasses import dataclass, field
@@ -88,16 +90,59 @@ def load_sender_settings(env_path: Path, *, require_test_recipients: bool) -> Se
     if contains_link_or_html(from_name):
         raise ConfigError(f"{env_path}: invalid SMTP_FROM_NAME")
 
-    test_recipients: tuple[str, ...] = ()
-    if require_test_recipients:
-        raw = required("TEST_RECIPIENTS")
-        parts = [part for part in raw.split(",") if part.strip()]
-        normalized = [_valid_address(part) for part in parts]
-        if not 1 <= len(parts) <= 5 or any(address is None for address in normalized):
-            raise ConfigError(f"{env_path}: invalid TEST_RECIPIENTS")
-        test_recipients = tuple(normalized)
-
+    test_recipients = _test_recipients(env_path, required, require_test_recipients)
     return SenderSettings(host, int(port_text), user, password, sender, from_name, test_recipients)
+
+
+def _test_recipients(env_path: Path, required: Callable[[str], str], require: bool) -> tuple[str, ...]:
+    if not require:
+        return ()
+    raw = required("TEST_RECIPIENTS")
+    parts = [part for part in raw.split(",") if part.strip()]
+    normalized = [_valid_address(part) for part in parts]
+    if not 1 <= len(parts) <= 5 or any(address is None for address in normalized):
+        raise ConfigError(f"{env_path}: invalid TEST_RECIPIENTS")
+    return tuple(normalized)
+
+
+GMAIL_HOST = "smtp.gmail.com"
+GMAIL_PORT = 465
+
+
+def load_gmail_settings(env_path: Path, *, require_test_recipients: bool) -> SenderSettings:
+    """Artemisa campaign sender (spec 006 D6): a Gmail account with an app password; sender = user."""
+    env_path = Path(env_path)
+    if not env_path.is_file():
+        raise ConfigError(f"{env_path}: file not found")
+    values = dotenv_values(env_path)
+
+    def required(key: str) -> str:
+        value = values.get(key) or ""
+        if not value.strip():
+            raise ConfigError(f"{env_path}: missing {key}")
+        return value
+
+    user = _valid_address(required("ARTEMISA_GMAIL_USER"))
+    if user is None:
+        raise ConfigError(f"{env_path}: invalid ARTEMISA_GMAIL_USER")
+    password = required("ARTEMISA_GMAIL_PASS")
+    from_name = required("ARTEMISA_GMAIL_FROM_NAME").strip()
+    if contains_link_or_html(from_name):
+        raise ConfigError(f"{env_path}: invalid ARTEMISA_GMAIL_FROM_NAME")
+    test_recipients = _test_recipients(env_path, required, require_test_recipients)
+    return SenderSettings(GMAIL_HOST, GMAIL_PORT, user, password, user, from_name, test_recipients)
+
+
+def load_artemisa_ses_settings(env_path: Path, *, require_test_recipients: bool) -> SenderSettings:
+    """Artemisa campaign through SES (spec 006 D6, `--sender ses`): the SES keys (HOST_EMAIL, PORT_EMAIL,
+    USER_EMAIL, PASS_EMAIL, SENDER_EMAIL) with ARTEMISA_GMAIL_FROM_NAME as display name when set."""
+    settings = load_sender_settings(env_path, require_test_recipients=require_test_recipients)
+    from_name = (dotenv_values(Path(env_path)).get("ARTEMISA_GMAIL_FROM_NAME") or "").strip()
+    if from_name:
+        if contains_link_or_html(from_name):
+            raise ConfigError(f"{env_path}: invalid ARTEMISA_GMAIL_FROM_NAME")
+        settings = dataclasses.replace(settings, from_name=from_name)
+    return settings
 
 
 def default_smtp_factory(settings: SenderSettings) -> smtplib.SMTP:
@@ -154,10 +199,33 @@ def _recipient_code(error: smtplib.SMTPRecipientsRefused) -> int | None:
     return None
 
 
+# Gmail may report its account sending limit at the recipient stage ("550 5.4.5 Daily user sending
+# limit exceeded"); that is throttling of the sender, never a bad recipient (spec 006 D6).
+_SENDING_LIMIT_MARKERS = (b"5.4.5", b"sending limit")
+
+
+def _is_sending_limit(text: object) -> bool:
+    raw = text if isinstance(text, bytes) else str(text).encode()
+    return any(marker in raw.lower() for marker in _SENDING_LIMIT_MARKERS)
+
+
+def _recipient_outcome(code: int | None, text: object) -> SendOutcome:
+    if code is not None and 500 <= code < 600:
+        if _is_sending_limit(text):
+            return _outcome("temporary_failure", "provider_throttled", code)
+        return _outcome("permanent_rejection", "recipient_refused", code)
+    return _outcome("temporary_failure", "recipient_deferred", code)
+
+
 def send_email(settings: SenderSettings, email: RenderedEmail, now: datetime,
                smtp_factory: Callable | None = None) -> SendOutcome:
+    return send_message(settings, build_message(settings, email, now), email.to, smtp_factory)
+
+
+def send_message(settings: SenderSettings, message: EmailMessage, to: str,
+                 smtp_factory: Callable | None = None) -> SendOutcome:
+    """Send one prebuilt message to one recipient and classify the SMTP outcome."""
     factory = smtp_factory or default_smtp_factory
-    message = build_message(settings, email, now)
     try:
         client = factory(settings)
     except OSError:  # includes smtplib.SMTPException subclasses raised while connecting
@@ -173,12 +241,11 @@ def send_email(settings: SenderSettings, email: RenderedEmail, now: datetime,
         # Nothing before this call can have delivered the email; anything uncertain after it
         # is classified as unknown and never retried.
         try:
-            refused = client.sendmail(settings.sender, [email.to], message.as_bytes())
+            refused = client.sendmail(settings.sender, [to], message.as_bytes())
         except smtplib.SMTPRecipientsRefused as error:
-            code = _recipient_code(error)
-            if code is not None and 500 <= code < 600:
-                return _outcome("permanent_rejection", "recipient_refused", code)
-            return _outcome("temporary_failure", "recipient_deferred", code)
+            for code, text in error.recipients.values():
+                return _recipient_outcome(code, text)
+            return _recipient_outcome(None, b"")
         except smtplib.SMTPSenderRefused as error:
             return _outcome("temporary_failure", "sender_refused", error.smtp_code)
         except smtplib.SMTPDataError as error:
@@ -197,10 +264,8 @@ def send_email(settings: SenderSettings, email: RenderedEmail, now: datetime,
             return _outcome("unknown", "connection_lost")
 
         if refused:
-            code = next(iter(refused.values()))[0]
-            if 500 <= code < 600:
-                return _outcome("permanent_rejection", "recipient_refused", code)
-            return _outcome("temporary_failure", "recipient_deferred", code)
+            code, text = next(iter(refused.values()))
+            return _recipient_outcome(code, text)
         return _outcome("accepted", None, 250, str(message["Message-ID"]))
     finally:
         _quit(client)

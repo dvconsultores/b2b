@@ -74,6 +74,35 @@ FORCE_NO_DMARC=1 CONFIRM_CAMPAIGN=primer-contacto-2026-b docker compose -f b2b.y
 docker compose -f b2b.yml logs -f
 ```
 
+## Artemisa P2P founders campaign (spec 006, runs locally)
+
+A separate campaign to Artemisa P2P's own users (`contactos/artemisa.csv`, images `27.png` and
+`43.png`), sent from the Artemisa Gmail account rather than SES, and run from this machine (not the
+container). It keeps its own tracker `data/artemisa.sqlite3` (user id, email, first name, nickname,
+types only); nothing is shared with the nómina lists.
+
+Pacing: one email about every 90 seconds (40 per hour with ±20 % jitter), so the 340 contacts take
+about 8.5 hours inside one day's window; the run keeps going until the list is done or a guard stops it.
+
+```bash
+# .env: ARTEMISA_GMAIL_USER / ARTEMISA_GMAIL_PASS (app password) / ARTEMISA_GMAIL_FROM_NAME, TEST_RECIPIENTS
+.venv/bin/python -m b2b.send_artemisa --mode import     # CSV → data/artemisa.sqlite3 (repeatable, counts only)
+.venv/bin/python -m b2b.send_artemisa --mode preview    # every pending email → data/previews/artemisa-…txt
+.venv/bin/python -m b2b.send_artemisa --mode test       # real multipart email (text + HTML + 2 inline PNG) to TEST_RECIPIENTS
+.venv/bin/python -m b2b.send_artemisa --mode send --wait-for-window [--notify]   # asks for the campaign name
+# --sender ses on any mode uses the SES keys (HOST_EMAIL … SENDER_EMAIL) instead of the Gmail account;
+# the From name is still ARTEMISA_GMAIL_FROM_NAME when set.
+```
+
+Limits come from `config/artemisa.toml`: `hourly_cap` (40) and `daily_cap` (400, rolling 24 hours —
+Gmail personal accounts allow about 500 and block for 24 hours when exceeded), window 09:00–21:00
+America/Caracas every day. Each email is about 2.8 MB (two 1 MB PNGs, base64). The run stops on
+Gmail throttling (`provider_throttled`), a daily-limit rejection (`message_rejected`), three
+consecutive temporary failures, or a permanent-rejection rate above 5% after 20 sends; relaunching
+continues with the contacts that have no attempt yet (never twice to the same user). A new or
+rarely used Gmail account may be limited well below 500: lower the caps (for example 20/hour,
+150/day) and let the run span several days with `--wait-for-window`.
+
 ## Email verification (optional)
 
 The first campaign bounced at 18%: the domain check cannot tell whether a mailbox still exists.

@@ -2,7 +2,8 @@
 #
 # push-contactos.sh — Upload the contact spreadsheets from this machine to the server.
 #
-#   Local  : contactos/${CLIENTS_FILE} and contactos/${YEARBOOK_FILE}
+#   Local  : contactos/${CLIENTS_FILE} and contactos/${YEARBOOK_FILE}, plus the Artemisa files
+#            (contactos/${ARTEMISA_FILE:-artemisa.csv}, 27.png, 43.png) when they exist
 #   Server : ${SRVUSER}@${SRVHOST}:${SRVCONTACTOS_LOCATION:-/opt/b2b/contactos}/
 #
 # The b2b-outreach container mounts that folder read-only and imports it into the database on
@@ -41,6 +42,8 @@ SRVHOST="$(env_val SRVHOST)"
 REMOTE_DIR="$(env_val SRVCONTACTOS_LOCATION)"; REMOTE_DIR="${REMOTE_DIR:-/opt/b2b/contactos}"
 CLIENTS_FILE="$(env_val CLIENTS_FILE)"; CLIENTS_FILE="${CLIENTS_FILE:-ClientesFebrero2020.xls}"
 YEARBOOK_FILE="$(env_val YEARBOOK_FILE)"; YEARBOOK_FILE="${YEARBOOK_FILE:-Year Book 2009.xlsx}"
+ARTEMISA_FILE="$(env_val ARTEMISA_FILE)"; ARTEMISA_FILE="${ARTEMISA_FILE:-artemisa.csv}"
+ARTEMISA_OPTIONAL=("$ARTEMISA_FILE" "27.png" "43.png")
 REMOTE_DIR="${REMOTE_DIR%/}"
 
 if [[ -z "$SRVUSER" || -z "$SRVHOST" ]]; then
@@ -75,6 +78,12 @@ remote "mkdir -p '$REMOTE_DIR' && chmod 700 '$REMOTE_DIR'"
 for file in "$CLIENTS_FILE" "$YEARBOOK_FILE"; do
     echo "📤 Uploading contactos/$file → $REMOTE_DIR/"
     push "$SCRIPT_DIR/contactos/$file" "$REMOTE_DIR/$file"
+done
+for file in "${ARTEMISA_OPTIONAL[@]}"; do
+    if [[ -f "$SCRIPT_DIR/contactos/$file" ]]; then
+        echo "📤 Uploading contactos/$file → $REMOTE_DIR/  (Artemisa campaign)"
+        push "$SCRIPT_DIR/contactos/$file" "$REMOTE_DIR/$file"
+    fi
 done
 remote "chmod 600 '$REMOTE_DIR'/*"
 

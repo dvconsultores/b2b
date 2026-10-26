@@ -3,6 +3,7 @@
 # push-db.sh — Upload the b2b contact database from this machine to the server.
 #
 #   Local DB  : ${LOCADB_LOCATION:-data}/${DBNAME:-b2b.sqlite3}
+#               (DBNAME=artemisa.sqlite3 ./push-db.sh uploads the Artemisa tracker instead)
 #   Server DB : ${SRVUSER}@${SRVHOST}:${SRVDB_LOCATION:-/opt/b2b/data}/${DBNAME:-b2b.sqlite3}
 #               (/opt/b2b/data is mounted by b2b.yml as /app/data)
 #
@@ -56,7 +57,7 @@ SRVPASS="$(env_val SRVPASS)"
 SRVHOST="$(env_val SRVHOST)"
 SRVDB_LOCATION="$(env_val SRVDB_LOCATION)"
 LOCADB_LOCATION="$(env_val LOCADB_LOCATION)"
-DBNAME="$(env_val DBNAME)"
+DBNAME="${DBNAME:-$(env_val DBNAME)}"
 
 if [[ -z "$SRVUSER" || -z "$SRVHOST" ]]; then
     echo "❌ SRVUSER / SRVHOST missing in $ENV_FILE (SRVPASS too, unless you use SSH keys)" >&2
@@ -102,10 +103,12 @@ push() {
 echo "🔌 Connecting to ${SRVUSER}@${SRVHOST} ..."
 
 # ── Guard 1: never push while a batch is running ──────────────────────────
-if remote "docker ps -q -f name=^b2b-outreach\$ 2>/dev/null" | grep -q .; then
-    echo "❌ The b2b-outreach container is running on the server. Wait for the batch to finish (or stop it) first." >&2
-    exit 1
-fi
+for _container in b2b-outreach b2b-artemisa; do
+    if remote "docker ps -q -f name=^${_container}\$ 2>/dev/null" | grep -q .; then
+        echo "❌ The ${_container} container is running on the server. Wait for the batch to finish (or stop it) first." >&2
+        exit 1
+    fi
+done
 
 # ── Guard 2: never replace more tracking history with less ────────────────
 # Tracking history = send attempts + contacts with any tracking flag set.
